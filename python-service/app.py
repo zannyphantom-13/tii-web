@@ -75,27 +75,37 @@ def send_email(email, subject, body):
     Send email via Flask-Mail for production (Render).
     Falls back to mock email for localhost development.
     """
-    if ENVIRONMENT == 'production' and app.config['MAIL_USERNAME']:
-        try:
-            msg = Message(
-                subject=subject,
-                recipients=[email],
-                body=body,
-                sender=app.config['MAIL_DEFAULT_SENDER']
-            )
-            mail.send(msg)
-            print(f"✓ Email sent to {email}", flush=True)
-        except Exception as e:
-            print(f"✗ Email send failed: {e}", flush=True)
-            # Still log the OTP for debugging
-            print(f"OTP Code: {body}", flush=True)
-    else:
-        # Mock email sender for localhost or when MAIL_USERNAME isn't configured
-        print("-" * 25 + " MOCK EMAIL SENDER " + "-" * 25, flush=True)
-        print(f"To: {email}", flush=True)
-        print(f"Subject: {subject}", flush=True)
-        print(f"Body: {body}", flush=True)
-        print("-" * 65, flush=True)
+    # Use a background thread to avoid blocking the request/response cycle.
+    def _send():
+        if ENVIRONMENT == 'production' and app.config['MAIL_USERNAME']:
+            try:
+                msg = Message(
+                    subject=subject,
+                    recipients=[email],
+                    body=body,
+                    sender=app.config['MAIL_DEFAULT_SENDER']
+                )
+                mail.send(msg)
+                print(f"✓ Email sent to {email}", flush=True)
+            except Exception as e:
+                print(f"✗ Email send failed: {e}", flush=True)
+                # Still log the OTP for debugging
+                print(f"OTP Code: {body}", flush=True)
+        else:
+            # Mock email sender for localhost or when MAIL_USERNAME isn't configured
+            print("-" * 25 + " MOCK EMAIL SENDER " + "-" * 25, flush=True)
+            print(f"To: {email}", flush=True)
+            print(f"Subject: {subject}", flush=True)
+            print(f"Body: {body}", flush=True)
+            print("-" * 65, flush=True)
+
+    try:
+        import threading
+        t = threading.Thread(target=_send, daemon=True)
+        t.start()
+    except Exception:
+        # Fallback to synchronous send if threading isn't available
+        _send()
 
 def generate_otp():
     return str(random.randint(100000, 999999))
