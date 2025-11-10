@@ -117,6 +117,12 @@ export function handleRegistration() {
             if (response.ok) {
                 alert(result.message);
                 localStorage.setItem('verificationEmail', email);
+                // If server returned an OTP in dev mode, save it so the OTP page can display it.
+                if (result.otp) {
+                    localStorage.setItem('debug_otp', result.otp);
+                } else {
+                    localStorage.removeItem('debug_otp');
+                }
                 window.location.href = 'otp-verification.html';
             } else {
                 if (errorElement) errorElement.textContent = `Registration Failed: ${result.message}`;
@@ -196,6 +202,30 @@ export function handleOTPVerification() {
 
     if (emailDisplay) emailDisplay.textContent = email;
 
+    // If a debug OTP was saved (development only), show it on the page for easier testing
+    const debugOtp = localStorage.getItem('debug_otp');
+    if (debugOtp) {
+        let debugDiv = document.getElementById('debug-otp-display');
+        if (!debugDiv) {
+            debugDiv = document.createElement('div');
+            debugDiv.id = 'debug-otp-display';
+            debugDiv.style.marginTop = '1rem';
+            debugDiv.style.padding = '0.5rem';
+            debugDiv.style.background = '#fff7e6';
+            debugDiv.style.border = '1px solid #ffd27a';
+            debugDiv.style.borderRadius = '4px';
+            debugDiv.style.color = '#663c00';
+            debugDiv.style.fontWeight = '600';
+
+            if (verificationForm) {
+                verificationForm.parentNode.insertBefore(debugDiv, verificationForm.nextSibling);
+            } else {
+                document.body.appendChild(debugDiv);
+            }
+        }
+        debugDiv.textContent = `DEV OTP (only shown in non-production): ${debugOtp}`;
+    }
+
     if (verificationForm) {
         verificationForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -218,6 +248,7 @@ export function handleOTPVerification() {
                 if (response.ok) {
                     alert(result.message);
                     localStorage.removeItem('verificationEmail');
+                    localStorage.removeItem('debug_otp');
                     localStorage.setItem('authToken', result.authToken);
                     localStorage.setItem('userName', result.full_name);
                     localStorage.setItem('userRole', result.role);

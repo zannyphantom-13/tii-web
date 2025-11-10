@@ -84,18 +84,18 @@ def send_email(email, subject, body):
                 sender=app.config['MAIL_DEFAULT_SENDER']
             )
             mail.send(msg)
-            print(f"✓ Email sent to {email}")
+            print(f"✓ Email sent to {email}", flush=True)
         except Exception as e:
-            print(f"✗ Email send failed: {e}")
+            print(f"✗ Email send failed: {e}", flush=True)
             # Still log the OTP for debugging
-            print(f"OTP Code: {body}")
+            print(f"OTP Code: {body}", flush=True)
     else:
-        # Mock email sender for localhost
-        print("-" * 25 + " MOCK EMAIL SENDER " + "-" * 25)
-        print(f"To: {email}")
-        print(f"Subject: {subject}")
-        print(f"Body: {body}")
-        print("-" * 65)
+        # Mock email sender for localhost or when MAIL_USERNAME isn't configured
+        print("-" * 25 + " MOCK EMAIL SENDER " + "-" * 25, flush=True)
+        print(f"To: {email}", flush=True)
+        print(f"Subject: {subject}", flush=True)
+        print(f"Body: {body}", flush=True)
+        print("-" * 65, flush=True)
 
 def generate_otp():
     return str(random.randint(100000, 999999))
@@ -156,10 +156,15 @@ def register():
             f"Your 6-digit verification code is: {otp_code}\n\nThis code expires in 5 minutes."
         )
 
-        return jsonify({
+        # Build response. In non-production (development/testing) include the OTP in the response
+        response_payload = {
             'message': 'Registration successful. Verification code sent to your email.',
             'email': email
-        }), 201
+        }
+        if ENVIRONMENT != 'production':
+            response_payload['otp'] = otp_code
+
+        return jsonify(response_payload), 201
 
     except Exception as e:
         db.session.rollback()
@@ -187,11 +192,15 @@ def resend_otp():
 
         send_email(
             email,
-            "Your 6-Digit Verification Code",
+            "Your new 6-Digit Verification Code",
             f"Your new 6-digit verification code is: {otp_code}\n\nThis code expires in 5 minutes."
         )
 
-        return jsonify({'message': 'New verification code sent to your email.'}), 200
+        response_payload = {'message': 'New verification code sent to your email.'}
+        if ENVIRONMENT != 'production':
+            response_payload['otp'] = otp_code
+
+        return jsonify(response_payload), 200
 
     except Exception as e:
         db.session.rollback()
