@@ -1,6 +1,6 @@
 import os
 import random
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
@@ -12,7 +12,9 @@ from dotenv import load_dotenv
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(os.path.dirname(BASE_DIR), '.env'))
 
-app = Flask(__name__)
+# Serve frontend static files (HTML/JS/CSS) from the sibling `frontend/` directory
+FRONTEND_DIR = os.path.join(os.path.dirname(BASE_DIR), 'frontend')
+app = Flask(__name__, static_folder=FRONTEND_DIR, template_folder=FRONTEND_DIR)
 CORS(app)
 
 # Environment-based configuration
@@ -101,7 +103,23 @@ def generate_otp():
 # --- ROUTES ---
 @app.route('/')
 def index_route():
+    # If the frontend `index.html` exists, serve it so the site loads in a browser.
+    index_path = os.path.join(FRONTEND_DIR, 'index.html')
+    if os.path.exists(index_path):
+        return app.send_static_file('index.html')
+
+    # Fallback JSON for API-only deployments
     return jsonify({"message": "Backend Server is Running."}), 200
+
+
+# Serve other static frontend assets (JS, CSS, images, etc.) when requested.
+@app.route('/<path:filename>')
+def serve_frontend(filename):
+    file_path = os.path.join(FRONTEND_DIR, filename)
+    if os.path.exists(file_path):
+        return send_from_directory(FRONTEND_DIR, filename)
+    # If not found as a static file, return a 404 JSON for API clients.
+    return jsonify({'message': 'Not Found'}), 404
 
 # --- REGISTRATION ---
 @app.route('/register', methods=['POST'])
