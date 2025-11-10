@@ -1,0 +1,33 @@
+# Environment variables
+.env
+.env.local
+
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
