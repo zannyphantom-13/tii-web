@@ -267,7 +267,12 @@ export function handleOTPVerification() {
 
     if (resendButton) {
         resendButton.addEventListener('click', async () => {
-            errorElement.textContent = 'Sending new code...';
+            // Prevent multiple clicks and provide user feedback
+            resendButton.disabled = true;
+            const originalText = resendButton.textContent;
+            resendButton.textContent = 'Sending...';
+            if (errorElement) errorElement.textContent = '';
+
             try {
                 const response = await fetch(`${API_URL}/resend-otp`, {
                     method: 'POST',
@@ -275,10 +280,36 @@ export function handleOTPVerification() {
                     body: JSON.stringify({ email }),
                 });
 
-                const result = await response.json();
-                errorElement.textContent = result.message;
-            } catch {
-                errorElement.textContent = 'Network error while resending OTP.';
+                // Try to parse JSON, but guard against non-JSON responses
+                let result = null;
+                try {
+                    result = await response.json();
+                } catch (parseErr) {
+                    console.error('Failed to parse JSON from resend-otp:', parseErr);
+                }
+
+                if (result && result.message) {
+                    errorElement.textContent = result.message;
+                } else if (!response.ok) {
+                    errorElement.textContent = 'Failed to resend code.';
+                } else {
+                    errorElement.textContent = 'A new code was sent.';
+                }
+
+                // If server returned a debug OTP (development), display it on the page
+                if (result && result.otp) {
+                    localStorage.setItem('debug_otp', result.otp);
+                    // Update the debug OTP box if present
+                    const existing = document.getElementById('debug-otp-display');
+                    if (existing) existing.textContent = `DEV OTP (only shown in non-production): ${result.otp}`;
+                }
+            } catch (err) {
+                console.error('Resend OTP error:', err);
+                if (errorElement) errorElement.textContent = 'Network error while resending OTP.';
+            } finally {
+                // Restore button state
+                resendButton.disabled = false;
+                resendButton.textContent = originalText;
             }
         });
     }
