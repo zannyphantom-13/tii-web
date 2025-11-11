@@ -47,7 +47,8 @@ mail = Mail(app)
 db = SQLAlchemy(app)
 
 # --- GLOBAL CONSTANTS ---
-ADMIN_RECIPIENT_EMAIL = os.getenv('ADMIN_EMAIL', 'admincodestii@gmail.com')
+# Primary admin email used for admin token routing and notifications
+ADMIN_RECIPIENT_EMAIL = os.getenv('ADMIN_EMAIL', 'codestiiwebadmin@gmail.com')
 ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')  # 'development' or 'production'
 
 # --- MODELS ---

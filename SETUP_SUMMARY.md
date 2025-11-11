@@ -259,7 +259,7 @@ MAIL_PASSWORD=<app-password>
 | MAIL_SERVER | smtp.gmail.com | smtp.gmail.com | If emailing | User |
 | MAIL_USERNAME | (empty) | your-email | If emailing | User |
 | MAIL_PASSWORD | (empty) | app-password | If emailing | User |
-| ADMIN_EMAIL | hazytarzan12@gmail.com | (same) | Yes | User |
+| ADMIN_EMAIL | codestiiwebadmin@gmail.com | (same) | Yes | User |
 | PORT | 3000 | (assigned) | Auto | Render |
 
 ---

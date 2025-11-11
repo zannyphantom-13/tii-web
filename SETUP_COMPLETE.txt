@@ -65,7 +65,7 @@ MAIL_SERVER=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USERNAME=  (leave blank for mock emails)
 MAIL_PASSWORD=  (leave blank for mock emails)
-ADMIN_EMAIL=hazytarzan12@gmail.com
+ADMIN_EMAIL=codestiiwebadmin@gmail.com
 ```
 
 **For Render**, you'll set different values in the dashboard:

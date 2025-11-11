@@ -83,7 +83,7 @@
     MAIL_USERNAME=
     MAIL_PASSWORD=
     MAIL_DEFAULT_SENDER=noreply@tii.com
-    ADMIN_EMAIL=hazytarzan12@gmail.com
+    ADMIN_EMAIL=codestiiwebadmin@gmail.com
 
     ⚠️  NEVER commit .env to GitHub!
         (.gitignore prevents accidental commits)

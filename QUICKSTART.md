@@ -81,7 +81,7 @@ Your `.env` file has been created with:
 - `ENVIRONMENT=development`
 - `SECRET_KEY` and `JWT_SECRET` for local testing
 - Email configuration (set your Gmail credentials if needed)
-- `ADMIN_EMAIL=hazytarzan12@gmail.com`
+- `ADMIN_EMAIL=codestiiwebadmin@gmail.com`
 
 **For production (Render)**, you'll set:
 - `ENVIRONMENT=production`

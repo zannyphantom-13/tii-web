@@ -57,7 +57,7 @@ MAIL_USE_TLS=True
 MAIL_USERNAME=<your-gmail>
 MAIL_PASSWORD=<your-app-password>
 MAIL_DEFAULT_SENDER=noreply@tii.com
-ADMIN_EMAIL=admincodestii@gmail.com
+ADMIN_EMAIL=codestiiwebadmin@gmail.com
 JWT_SECRET=<another-secure-random-string>
 ```
 
