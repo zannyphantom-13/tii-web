@@ -35,7 +35,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Email Configuration - Flask-Mail
 app.config['MAIL_SERVER'] = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
 app.config['MAIL_PORT'] = int(os.getenv('MAIL_PORT', 587))
-app.config['MAIL_USE_TLS'] = os.getenv('MAIL_USE_TLS', True)
+# MAIL_USE_TLS may be set as a string in the environment (e.g. "true"),
+# so normalize it to a boolean here.
+mail_use_tls_env = os.getenv('MAIL_USE_TLS', 'True')
+app.config['MAIL_USE_TLS'] = str(mail_use_tls_env).lower() in ('1', 'true', 'yes', 'on')
 app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME', '')
 app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD', '')
 app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'noreply@tii.com')
