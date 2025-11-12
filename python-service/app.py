@@ -8,6 +8,7 @@ from flask_cors import CORS
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
 import socket
+import requests
 
 # --- CONFIGURATION ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -122,6 +123,38 @@ def send_email(email, subject, body, html_template=None, template_context=None):
 
     # Use a background thread to avoid blocking the request/response cycle.
     def _send():
+        # If a SendGrid API key is provided, prefer the HTTP API (works from hosts that block SMTP)
+        sendgrid_key = os.getenv('SENDGRID_API_KEY')
+        if sendgrid_key:
+            try:
+                sg_url = 'https://api.sendgrid.com/v3/mail/send'
+                headers = {
+                    'Authorization': f'Bearer {sendgrid_key}',
+                    'Content-Type': 'application/json'
+                }
+                # Build SendGrid payload
+                payload = {
+                    'personalizations': [
+                        {'to': [{'email': email}], 'subject': subject}
+                    ],
+                    'from': {'email': app.config.get('MAIL_DEFAULT_SENDER')},
+                    'content': []
+                }
+                # Always include plaintext
+                payload['content'].append({'type': 'text/plain', 'value': body})
+                # Include HTML if available
+                if html_content:
+                    payload['content'].append({'type': 'text/html', 'value': html_content})
+
+                resp = requests.post(sg_url, headers=headers, json=payload, timeout=10)
+                if 200 <= resp.status_code < 300:
+                    print(f"✓ SendGrid email sent to {email}", flush=True)
+                else:
+                    print(f"✗ SendGrid send failed ({resp.status_code}): {resp.text}", flush=True)
+            except Exception as e:
+                print(f"✗ SendGrid send exception: {e}", flush=True)
+            return
+
         if ENVIRONMENT == 'production' and app.config['MAIL_USERNAME']:
             try:
                 msg = Message(
