@@ -1,12 +1,13 @@
 import os
 import random
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, render_template_string
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from flask_cors import CORS
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
+import socket
 
 # --- CONFIGURATION ---
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -19,6 +20,9 @@ CORS(app)
 
 # Environment-based configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your_strong_secret_key_here')
+
+# Environment flag (set early so startup logs can reference it)
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')  # 'development' or 'production'
 
 # Database Configuration - Works on localhost and Render
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -46,10 +50,26 @@ app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'noreply@ti
 mail = Mail(app)
 db = SQLAlchemy(app)
 
+# --- STARTUP LOGS (helpful for debugging email delivery on hosts like Render) ---
+def _mask(s):
+    if not s:
+        return '<empty>'
+    if len(s) <= 4:
+        return '****'
+    return s[:2] + '*' * (len(s) - 4) + s[-2:]
+
+print("=== STARTUP CONFIG ===", flush=True)
+print(f"ENVIRONMENT={ENVIRONMENT}", flush=True)
+print(f"MAIL_SERVER={app.config.get('MAIL_SERVER')}", flush=True)
+print(f"MAIL_PORT={app.config.get('MAIL_PORT')}", flush=True)
+print(f"MAIL_USE_TLS={app.config.get('MAIL_USE_TLS')}", flush=True)
+print(f"MAIL_USERNAME={_mask(app.config.get('MAIL_USERNAME'))}", flush=True)
+print(f"MAIL_DEFAULT_SENDER={app.config.get('MAIL_DEFAULT_SENDER')}", flush=True)
+print("======================", flush=True)
+
 # --- GLOBAL CONSTANTS ---
 # Primary admin email used for admin token routing and notifications
-ADMIN_RECIPIENT_EMAIL = os.getenv('ADMIN_EMAIL', 'codestiiwebadmin@gmail.com')
-ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')  # 'development' or 'production'
+ADMIN_RECIPIENT_EMAIL = os.getenv('ADMIN_EMAIL', 'codestiiweb@gmail.com')
 
 # --- MODELS ---
 class User(db.Model):
@@ -74,11 +94,32 @@ class OTP(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
 
 # --- UTILITIES ---
-def send_email(email, subject, body):
+def send_email(email, subject, body, html_template=None, template_context=None):
     """
     Send email via Flask-Mail for production (Render).
     Falls back to mock email for localhost development.
+
+    Parameters:
+    - email: recipient email address
+    - subject: email subject
+    - body: plaintext body (fallback)
+    - html_template: (optional) filename under python-service/templates/ to render as HTML
+    - template_context: (optional) dict of template variables (e.g. {'otp': '123456'})
     """
+    template_context = template_context or {}
+
+    # Render HTML from template file if provided (safe fallback to plaintext body)
+    html_content = None
+    if html_template:
+        try:
+            template_path = os.path.join(BASE_DIR, 'templates', html_template)
+            if os.path.exists(template_path):
+                with open(template_path, 'r', encoding='utf-8') as f:
+                    tpl = f.read()
+                html_content = render_template_string(tpl, **template_context)
+        except Exception as e:
+            print(f"Error rendering email template {html_template}: {e}", flush=True)
+
     # Use a background thread to avoid blocking the request/response cycle.
     def _send():
         if ENVIRONMENT == 'production' and app.config['MAIL_USERNAME']:
@@ -89,18 +130,23 @@ def send_email(email, subject, body):
                     body=body,
                     sender=app.config['MAIL_DEFAULT_SENDER']
                 )
+                if html_content:
+                    msg.html = html_content
                 mail.send(msg)
                 print(f"✓ Email sent to {email}", flush=True)
             except Exception as e:
                 print(f"✗ Email send failed: {e}", flush=True)
                 # Still log the OTP for debugging
-                print(f"OTP Code: {body}", flush=True)
+                print(f"Email body: {body}", flush=True)
         else:
             # Mock email sender for localhost or when MAIL_USERNAME isn't configured
             print("-" * 25 + " MOCK EMAIL SENDER " + "-" * 25, flush=True)
             print(f"To: {email}", flush=True)
             print(f"Subject: {subject}", flush=True)
             print(f"Body: {body}", flush=True)
+            if html_content:
+                print("HTML Content:", flush=True)
+                print(html_content, flush=True)
             print("-" * 65, flush=True)
 
     try:
@@ -167,7 +213,9 @@ def register():
         send_email(
             email,
             "Your 6-Digit Verification Code",
-            f"Your 6-digit verification code is: {otp_code}\n\nThis code expires in 5 minutes."
+            f"Your 6-digit verification code is: {otp_code}\n\nThis code expires in 5 minutes.",
+            html_template='tii_otp.html',
+            template_context={'otp': otp_code, 'expires_minutes': 5, 'purpose': 'verification'}
         )
 
         # Build response. In non-production (development/testing) include the OTP in the response
@@ -207,7 +255,9 @@ def resend_otp():
         send_email(
             email,
             "Your new 6-Digit Verification Code",
-            f"Your new 6-digit verification code is: {otp_code}\n\nThis code expires in 5 minutes."
+            f"Your new 6-digit verification code is: {otp_code}\n\nThis code expires in 5 minutes.",
+            html_template='tii_otp.html',
+            template_context={'otp': otp_code, 'expires_minutes': 5, 'purpose': 'verification'}
         )
 
         response_payload = {'message': 'New verification code sent to your email.'}
@@ -345,7 +395,9 @@ def send_admin_token():
             f"User {user_email} ({user.full_name}) is requesting admin access.\n\n"
             f"Approval token: {token_code}\n\n"
             f"This token expires in 10 minutes.\n\n"
-            f"Share this token with the user only if approved."
+            f"Share this token with the user only if approved.",
+            html_template='tii_otp.html',
+            template_context={'otp': token_code, 'expires_minutes': 10, 'purpose': 'admin_token', 'requestor': user_email}
         )
 
         return jsonify({
@@ -403,6 +455,65 @@ def admin_login():
         }), 200
     else:
         return jsonify({'message': 'Invalid or expired token.'}), 401
+
+# --- TEST EMAIL ENDPOINT (temporary, optional protection via TEST_EMAIL_KEY) ---
+@app.route('/send-test-email', methods=['POST'])
+def send_test_email():
+    """Trigger a test email send without creating a user.
+
+    JSON body (all optional):
+    - email: recipient (defaults to MAIL_USERNAME or MAIL_DEFAULT_SENDER)
+    - subject: email subject
+    - body: plaintext body
+
+    If the environment variable TEST_EMAIL_KEY is set, the request must include
+    header 'X-TEST-KEY' with the same value (simple protection for remote testing).
+    """
+    # Optional simple auth via env var to avoid accidental public usage
+    test_key = os.getenv('TEST_EMAIL_KEY')
+    if test_key:
+        provided = request.headers.get('X-TEST-KEY')
+        if provided != test_key:
+            return jsonify({'message': 'Unauthorized (missing or invalid X-TEST-KEY)'}), 401
+
+    data = request.get_json(silent=True) or {}
+    to_email = data.get('email') or app.config.get('MAIL_USERNAME') or app.config.get('MAIL_DEFAULT_SENDER')
+    subject = data.get('subject', 'TII Test Email')
+    body = data.get('body', f'This is a test email sent at {datetime.utcnow().isoformat()} UTC')
+
+    if not to_email:
+        return jsonify({'message': 'No recipient configured. Provide "email" in JSON or set MAIL_USERNAME/MAIL_DEFAULT_SENDER.'}), 400
+
+    try:
+        send_email(to_email, subject, body)
+        return jsonify({'message': 'Test email queued', 'to': to_email}), 200
+    except Exception as e:
+        print(f"Error sending test email: {e}", flush=True)
+        return jsonify({'message': 'Failed to queue test email', 'error': str(e)}), 500
+
+
+# --- SMTP CONNECTIVITY CHECK (useful to test from deployed host) ---
+@app.route('/check-smtp', methods=['GET'])
+def check_smtp():
+    """Attempt a TCP connection to the configured MAIL_SERVER:MAIL_PORT and return JSON result.
+
+    This endpoint is safe to expose briefly because it only performs a short outbound TCP check
+    and does not reveal secrets. For safety, you can remove it after debugging.
+    """
+    host = app.config.get('MAIL_SERVER')
+    port = app.config.get('MAIL_PORT')
+    timeout = 5
+
+    if not host or not port:
+        return jsonify({'can_connect': False, 'error': 'MAIL_SERVER or MAIL_PORT not configured', 'host': host, 'port': port}), 400
+
+    try:
+        # Try creating a TCP connection (this checks basic network reachability to the SMTP port)
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            pass
+        return jsonify({'can_connect': True, 'host': host, 'port': port}), 200
+    except Exception as e:
+        return jsonify({'can_connect': False, 'host': host, 'port': port, 'error': str(e)}), 200
 
 # --- SERVER SETUP ---
 if __name__ == '__main__':
