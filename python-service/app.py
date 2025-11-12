@@ -3,7 +3,7 @@ import random
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask_cors import CORS
 from flask_mail import Mail, Message
 from dotenv import load_dotenv
@@ -66,6 +66,7 @@ print(f"MAIL_PORT={app.config.get('MAIL_PORT')}", flush=True)
 print(f"MAIL_USE_TLS={app.config.get('MAIL_USE_TLS')}", flush=True)
 print(f"MAIL_USERNAME={_mask(app.config.get('MAIL_USERNAME'))}", flush=True)
 print(f"MAIL_DEFAULT_SENDER={app.config.get('MAIL_DEFAULT_SENDER')}", flush=True)
+print(f"SENDGRID_API_KEY_SET={'yes' if os.getenv('SENDGRID_API_KEY') else 'no'}", flush=True)
 print("======================", flush=True)
 
 # --- GLOBAL CONSTANTS ---
