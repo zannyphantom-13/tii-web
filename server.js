@@ -87,7 +87,7 @@ if (process.env.SENDGRID_API_KEY) {
 // UTILITIES
 // ============================================
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-const OTP_EXPIRY = 10 * 60 * 1000; // 10 minutes
+const OTP_EXPIRY = 3 * 60 * 1000; // 3 minutes for admin token
 
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -350,23 +350,57 @@ app.post('/send_admin_token', async (req, res) => {
       return res.status(404).json({ message: 'User not found.' });
     }
 
+    const user = snapshotVal(snapshot);
+
+    // Count active tokens across all users (limit pool to 5 active tokens)
+    const allUsersSnap = await db.ref('users').get();
+    const allUsers = snapshotVal(allUsersSnap) || {};
+    let activeCount = 0;
+    Object.keys(allUsers).forEach(k => {
+      const u = allUsers[k];
+      if (u && u.admin_token && u.admin_token_expiry && Date.now() <= u.admin_token_expiry) {
+        activeCount += 1;
+      }
+    });
+
+    // If this user already has an active token, return it instead of creating a new one
+    if (user.admin_token && user.admin_token_expiry && Date.now() <= user.admin_token_expiry) {
+      return res.json({
+        message: 'User already has an active admin token.',
+        token: user.admin_token,
+        expires_at: new Date(user.admin_token_expiry).toISOString(),
+      });
+    }
+
+    // Enforce global active token limit (max 5)
+    if (activeCount >= 5) {
+      return res.status(429).json({ message: 'Maximum number of active admin tokens reached. Please wait until a token is used or expires.' });
+    }
+
     // Generate admin token
     const adminToken = generateOTP(); // Simple 6-digit token
     const tokenExpiry = Date.now() + OTP_EXPIRY;
 
-    // Store admin token
+    // Store admin token on user
     await db.ref(`users/${email.replace(/\./g, '_')}`).update({
       admin_token: adminToken,
       admin_token_expiry: tokenExpiry,
+      admin_token_requested_at: Date.now(),
     });
 
     // Also persist the token under the user's tokens list so tokens can be listed per email
     try {
-      await db.ref(`users/${email.replace(/\./g, '_')}/tokens`).push({
+      const pushRef = await db.ref(`users/${email.replace(/\./g, '_')}/tokens`).push({
         token: adminToken,
         expires_at: tokenExpiry,
         created_at: Date.now(),
+        status: 'active',
       });
+      // If push returned a reference, store its key for future updates (best-effort)
+      const tokenKey = (pushRef && pushRef.key) ? pushRef.key : null;
+      if (tokenKey) {
+        await db.ref(`users/${email.replace(/\./g, '_')}/tokens/${tokenKey}`).update({ id: tokenKey });
+      }
     } catch (e) {
       console.warn('Failed to persist admin token under user tokens:', e && e.message ? e.message : e);
     }
@@ -378,7 +412,7 @@ app.post('/send_admin_token', async (req, res) => {
     console.log(`≡ƒôº User Email: ${email}`);
     console.log(`≡ƒöæ Admin Token: ${adminToken}`);
     console.log(`ΓÅ░ Token Expiry: ${new Date(tokenExpiry).toISOString()}`);
-    console.log(`ΓÅ│ Valid for: 10 minutes`);
+    console.log(`ΓÅ│ Valid for: 3 minutes`);
     console.log("============================================================");
 
     // Send token via SendGrid email
@@ -398,7 +432,7 @@ app.post('/send_admin_token', async (req, res) => {
               <h1 style="color: #2a6e62; font-size: 36px; letter-spacing: 5px; margin: 10px 0;">${adminToken}</h1>
             </div>
             <p style="color: #666; font-size: 14px;">
-              This token expires in <strong>10 minutes</strong>. Do not share this token with anyone.
+              This token expires in <strong>3 minutes</strong>. Do not share this token with anyone.
             </p>
             <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
             <p style="color: #999; font-size: 12px; text-align: center;">
@@ -462,6 +496,20 @@ app.post('/admin_login', async (req, res) => {
     }
 
     // Upgrade user to admin
+    // Mark token record as used (if present) and then upgrade user to admin
+    try {
+      const tokensSnap = await db.ref(`users/${email.replace(/\./g, '_')}/tokens`).get();
+      const tokens = snapshotVal(tokensSnap) || {};
+      Object.keys(tokens).forEach(async (tk) => {
+        const t = tokens[tk];
+        if (t && t.token === token && t.status === 'active') {
+          await db.ref(`users/${email.replace(/\./g, '_')}/tokens/${tk}`).update({ status: 'used', used_at: Date.now() });
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to mark token as used in tokens list:', e && e.message ? e.message : e);
+    }
+
     await db.ref(`users/${email.replace(/\./g, '_')}`).update({
       role: 'admin',
       admin_token: null,
@@ -485,6 +533,96 @@ app.post('/admin_login', async (req, res) => {
   } catch (error) {
     console.error('Admin login error:', error);
     res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+// ============================================
+// CHECK ADMIN TOKEN STATUS (for admin dashboard)
+// ============================================
+app.post('/api/admin-token-status', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email required.' });
+    }
+
+    const snapshot = await db.ref(`users/${email.replace(/\./g, '_')}`).get();
+    if (!snapshotExists(snapshot)) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const user = snapshotVal(snapshot);
+    
+    // Only show token if it exists and is not expired
+    if (user.admin_token && Date.now() <= user.admin_token_expiry) {
+      const timeRemaining = Math.ceil((user.admin_token_expiry - Date.now()) / 1000);
+      return res.json({
+        has_token: true,
+        token: user.admin_token,
+        expires_in_seconds: timeRemaining,
+        expires_at: new Date(user.admin_token_expiry).toISOString(),
+      });
+    } else {
+      return res.json({
+        has_token: false,
+        message: 'No active token. Request a new one.',
+      });
+    }
+  } catch (error) {
+    console.error('Token status check error:', error);
+    return res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+// ============================================
+// LIST ALL PENDING ADMIN TOKENS (admin only)
+// ============================================
+app.get('/api/admin-tokens', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader) return res.status(401).json({ message: 'Authorization header required.' });
+
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Bearer token required.' });
+
+    let payload;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch (verifyErr) {
+      return res.status(401).json({ message: 'Invalid or expired token.' });
+    }
+
+    // Only admins can view all pending tokens
+    if (payload.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required.' });
+    }
+
+    // Get all users and find those with pending tokens
+    const snapshot = await db.ref('users').get();
+    const users = snapshotVal(snapshot) || {};
+    const pendingTokens = [];
+
+    Object.keys(users).forEach(userKey => {
+      const user = users[userKey];
+      if (user.admin_token && Date.now() <= user.admin_token_expiry) {
+        const timeRemaining = Math.ceil((user.admin_token_expiry - Date.now()) / 1000);
+        pendingTokens.push({
+          email: user.email,
+          token: user.admin_token,
+          expires_in_seconds: timeRemaining,
+          requested_at: user.admin_token_requested_at || 'N/A',
+        });
+      }
+    });
+
+    return res.json({ 
+      pending_tokens: pendingTokens,
+      count: pendingTokens.length
+    });
+  } catch (error) {
+    console.error('List tokens error:', error);
+    return res.status(500).json({ message: 'Server error.' });
   }
 });
 

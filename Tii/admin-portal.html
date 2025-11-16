@@ -365,6 +365,32 @@
                 <a href="#" class="action-tile"><i class="fas fa-plus"></i><p>Add Assignments</p></a>
                 <a href="#" class="action-tile"><i class="fas fa-calendar-alt"></i><p>Update Course Schedule</p></a>
             </div>
+            <!-- Admin Tokens Panel -->
+            <h3>Admin Tokens (Active)</h3>
+            <p class="section-description">Visible to all admins. Tokens expire in 3 minutes. Maximum 5 active tokens system-wide.</p>
+            <div id="tokens-panel" style="margin-bottom:20px;">
+                <div style="margin-bottom:10px;">
+                    <form id="generate-token-form" style="display:flex;gap:8px;align-items:center;">
+                        <input type="email" id="token-target-email" placeholder="User email for token" required style="padding:8px;flex:1;" />
+                        <button type="submit" id="generate-token-btn" class="action-tile" style="padding:8px 12px;min-width:120px;">Generate Token</button>
+                    </form>
+                    <div id="generate-token-message" style="margin-top:8px;color:#2a6e62;font-size:0.95rem;"></div>
+                </div>
+
+                <div id="tokens-list" style="margin-top:12px;">
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead>
+                            <tr style="text-align:left;border-bottom:1px solid #e0e0e0;padding:6px;">
+                                <th style="padding:8px;">Email</th>
+                                <th style="padding:8px;">Token</th>
+                                <th style="padding:8px;">Expires In</th>
+                                <th style="padding:8px;">Requested At</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tokens-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -483,6 +509,101 @@
                 }
             });
         });
+
+        // --- ADMIN TOKENS: Polling and Generate (Admins only) ---
+        const API_URL = window.location.origin || 'http://localhost:3000';
+
+        async function fetchAdminTokens() {
+            const authToken = localStorage.getItem('authToken');
+            if (!authToken) return; // not signed in
+
+            try {
+                const resp = await fetch(`${API_URL}/api/admin-tokens`, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                if (!resp.ok) {
+                    console.warn('Unable to fetch tokens', resp.status);
+                    return;
+                }
+                const data = await resp.json();
+                renderTokens(data.pending_tokens || []);
+            } catch (err) {
+                console.error('Error fetching admin tokens:', err);
+            }
+        }
+
+        function renderTokens(tokens) {
+            const tbody = document.getElementById('tokens-tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+            if (!tokens.length) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="4" style="padding:12px;color:#666;">No active tokens</td>`;
+                tbody.appendChild(tr);
+                return;
+            }
+
+            tokens.forEach(t => {
+                const tr = document.createElement('tr');
+                const expires = t.expires_in_seconds ? `${t.expires_in_seconds}s` : (t.expires_at || 'N/A');
+                const reqAt = t.requested_at ? new Date(t.requested_at).toLocaleString() : 'N/A';
+                tr.innerHTML = `
+                    <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${t.email}</td>
+                    <td style="padding:8px;border-bottom:1px solid #f0f0f0;font-weight:700;">${t.token}</td>
+                    <td style="padding:8px;border-bottom:1px solid #f0f0f0;color:#c0392b;">${expires}</td>
+                    <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${reqAt}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Generate token form handling
+        const genForm = document.getElementById('generate-token-form');
+        if (genForm) {
+            genForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const emailInput = document.getElementById('token-target-email');
+                const msgEl = document.getElementById('generate-token-message');
+                if (!emailInput || !msgEl) return;
+                const targetEmail = emailInput.value.trim();
+                if (!targetEmail) {
+                    msgEl.textContent = 'Please enter a valid email.';
+                    return;
+                }
+
+                const authToken = localStorage.getItem('authToken');
+                try {
+                    const resp = await fetch(`${API_URL}/send_admin_token`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+                        },
+                        body: JSON.stringify({ email: targetEmail }),
+                    });
+                    const result = await resp.json();
+                    if (resp.ok) {
+                        msgEl.style.color = '#2a6e62';
+                        msgEl.textContent = result.message || 'Token generated.';
+                        emailInput.value = '';
+                        // Refresh list instantly
+                        fetchAdminTokens();
+                    } else {
+                        msgEl.style.color = '#c0392b';
+                        msgEl.textContent = result.message || 'Failed to generate token.';
+                    }
+                } catch (err) {
+                    msgEl.style.color = '#c0392b';
+                    msgEl.textContent = 'Network error while generating token.';
+                    console.error(err);
+                }
+            });
+        }
+
+        // Poll tokens every 10 seconds for near-real-time updates
+        fetchAdminTokens();
+        setInterval(fetchAdminTokens, 10000);
     </script>
     
     </body>
