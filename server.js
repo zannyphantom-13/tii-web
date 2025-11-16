@@ -525,6 +525,53 @@ app.get('/api/profile', async (req, res) => {
 });
 
 // ============================================
+// PROFILE UPDATE ENDPOINT (PUT /api/profile)
+// ============================================
+app.put('/api/profile', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader) return res.status(401).json({ message: 'Authorization header required.' });
+
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Bearer token required.' });
+
+    let payload;
+    try {
+      payload = jwt.verify(token, JWT_SECRET);
+    } catch (verifyErr) {
+      return res.status(401).json({ message: 'Invalid or expired token.' });
+    }
+
+    const email = payload.email;
+    const { phone_number, date_of_birth, country, bio } = req.body;
+
+    // Fetch existing user
+    const snapshot = await db.ref(`users/${email.replace(/\./g, '_')}`).get();
+    if (!snapshotExists(snapshot)) return res.status(404).json({ message: 'User not found.' });
+
+    // Update profile fields
+    const updates = {};
+    if (phone_number !== undefined) updates.phone_number = phone_number || '';
+    if (date_of_birth !== undefined) updates.date_of_birth = date_of_birth || '';
+    if (country !== undefined) updates.country = country || '';
+    if (bio !== undefined) updates.bio = bio || '';
+    updates.profile_updated_at = new Date().toISOString();
+
+    await db.ref(`users/${email.replace(/\./g, '_')}`).update(updates);
+
+    console.log(`✅ Profile updated for user: ${email}`);
+
+    return res.status(200).json({ 
+      message: 'Profile updated successfully.',
+      updates 
+    });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    return res.status(500).json({ message: 'Server error during profile update.' });
+  }
+});
+
+// ============================================
 // SECURITY QUESTION ENDPOINT
 // ============================================
 app.post('/api/security-question', async (req, res) => {

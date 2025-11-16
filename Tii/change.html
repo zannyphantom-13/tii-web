@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Profile - The Informatics Initiative</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .edit-profile-container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .edit-profile-container h3 {
+            color: #2a6e62;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+            max-height: 200px;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #2a6e62;
+            box-shadow: 0 0 5px rgba(42, 110, 98, 0.3);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .save-btn, .cancel-btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+
+        .save-btn {
+            background-color: #2a6e62;
+            color: white;
+        }
+
+        .save-btn:hover {
+            background-color: #1e4f46;
+        }
+
+        .cancel-btn {
+            background-color: #bbb;
+            color: white;
+        }
+
+        .cancel-btn:hover {
+            background-color: #999;
+        }
+
+        #profile-error, #profile-success {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        #profile-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        #profile-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            margin: 20px 0;
+        }
+    </style>
+    <script src="user-loader.js" defer></script>
+</head>
+<body class="login-body">
+    <header>
+        <a href="index.html">
+            <div class="logo-container">
+                <svg class="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="50,5 90,30 90,70 50,95 10,70 10,30" fill="transparent" stroke="#2a6e62" stroke-width="5"/>
+                    <circle cx="50" cy="50" r="10" fill="#2a6e62"/>
+                    <path d="M50 5 L50 95 M10 30 L90 70 M10 70 L90 30" stroke="#2a6e62" stroke-width="2"/>
+                </svg>
+                <h1>THE INFORMATICS INITIATIVE</h1>
+            </div>
+        </a>
+        <nav class="main-nav">
+            <a href="curriculum.html">Curriculum</a>
+            <a href="lessons.html">Weekly Lessons</a>
+            <a href="portal.html">Student Portal</a>
+            <a href="feedback.html">Feedback</a>
+        </nav>
+        <a id="auth-button" href="login.html" class="auth-btn">Login</a>
+    </header>
+
+    <main class="login-main">
+        <div class="edit-profile-container">
+            <h3><i class="fas fa-user-edit"></i> Edit Your Profile</h3>
+            
+            <div id="profile-error" style="display: none;"></div>
+            <div id="profile-success" style="display: none;"></div>
+
+            <form id="edit-profile-form">
+                <div class="form-group">
+                    <label for="phone_number"><i class="fas fa-phone"></i> Phone Number</label>
+                    <input type="tel" id="phone_number" name="phone_number" placeholder="E.g., +234 801 234 5678">
+                </div>
+
+                <div class="form-group">
+                    <label for="date_of_birth"><i class="fas fa-calendar-alt"></i> Date of Birth</label>
+                    <input type="date" id="date_of_birth" name="date_of_birth">
+                </div>
+
+                <div class="form-group">
+                    <label for="country"><i class="fas fa-globe-americas"></i> Country/Region</label>
+                    <input type="text" id="country" name="country" placeholder="E.g., Nigeria">
+                </div>
+
+                <div class="form-group">
+                    <label for="bio"><i class="fas fa-feather-alt"></i> Short Bio</label>
+                    <textarea id="bio" name="bio" placeholder="Tell us a little about your informatics interests (max 200 chars)" maxlength="200"></textarea>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="save-btn"><i class="fas fa-save"></i> Save Changes</button>
+                    <button type="button" class="cancel-btn" onclick="goBack()"><i class="fas fa-times"></i> Cancel</button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <footer>
+        <div class="copyright-bar">
+            <div class="social-links">
+                <a href="https://www.linkedin.com/company/informatics" target="_blank"><i class="fab fa-linkedin-in"></i></a>
+                <a href="https://www.twitter.com/informatics" target="_blank"><i class="fab fa-twitter"></i></a>
+                <a href="https://www.instagram.com/informatics" target="_blank"><i class="fab fa-instagram"></i></a>
+                <a href="https://www.youtube.com/informatics" target="_blank"><i class="fab fa-youtube"></i></a>
+                <a href="https://www.facebook.com/informatics" target="_blank"><i class="fab fa-facebook-f"></i></a>
+                <a href="https://www.tiktok.com/@informatics" target="_blank"><i class="fab fa-tiktok"></i></a>
+            </div>
+            <p>&copy; 2024 The Informatics Initiative. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script type="module">
+        import { handleAuthButton } from './auth.js';
+        handleAuthButton();
+    </script>
+
+    <script>
+        const API_URL = (typeof window !== 'undefined' && window.location && window.location.origin) || 'http://localhost:3000';
+        const form = document.getElementById('edit-profile-form');
+        const errorDiv = document.getElementById('profile-error');
+        const successDiv = document.getElementById('profile-success');
+
+        // Load existing profile data on page load
+        async function loadProfileData() {
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                errorDiv.textContent = '❌ You must be logged in to edit your profile.';
+                errorDiv.style.display = 'block';
+                setTimeout(() => window.location.href = 'login.html', 2000);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/profile`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to load profile');
+
+                const data = await response.json();
+                const user = data.user || {};
+
+                // Populate form with existing data
+                document.getElementById('phone_number').value = user.phone_number || '';
+                document.getElementById('date_of_birth').value = user.date_of_birth || '';
+                document.getElementById('country').value = user.country || '';
+                document.getElementById('bio').value = user.bio || '';
+            } catch (error) {
+                console.error('Error loading profile:', error);
+                errorDiv.textContent = '❌ Failed to load profile data.';
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                errorDiv.textContent = '❌ You must be logged in.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            const profileData = {
+                phone_number: document.getElementById('phone_number').value.trim(),
+                date_of_birth: document.getElementById('date_of_birth').value,
+                country: document.getElementById('country').value.trim(),
+                bio: document.getElementById('bio').value.trim()
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/profile`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(profileData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    successDiv.textContent = '✅ Profile updated successfully!';
+                    successDiv.style.display = 'block';
+                    setTimeout(() => window.location.href = 'profile.html', 2000);
+                } else {
+                    errorDiv.textContent = `❌ ${result.message || 'Failed to update profile'}`;
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Profile update error:', error);
+                errorDiv.textContent = '❌ A network error occurred. Please try again.';
+                errorDiv.style.display = 'block';
+            }
+        });
+
+        // Go back to profile page
+        function goBack() {
+            window.location.href = 'profile.html';
+        }
+
+        // Load profile on page load
+        window.addEventListener('DOMContentLoaded', loadProfileData);
+    </script>
+</body>
+</html>
