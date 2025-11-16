@@ -430,12 +430,21 @@ app.post('/send_admin_token', async (req, res) => {
     });
 
     // Send token via email (send to admin email from env)
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+    // Send token via SendGrid (preferred; falls back to log when not configured)
+    const adminMsg = {
       to: process.env.ADMIN_EMAIL || process.env.EMAIL_USER,
+      from: process.env.EMAIL_USER || 'noreply@informatics-initiative.com',
       subject: `Admin Access Request from ${email}`,
       html: `<p>Admin token: <strong>${adminToken}</strong></p><p>User: ${email}</p>`,
-    });
+    };
+
+    if (process.env.SENDGRID_API_KEY) {
+      await sgMail.send(adminMsg);
+      console.log(`✅ Admin token email sent to ${adminMsg.to}`);
+    } else {
+      console.warn('⚠️ SENDGRID_API_KEY not configured. Admin token not emailed.');
+      console.log(`Admin token for ${email}: ${adminToken}`);
+    }
 
     res.json({ message: 'Admin token sent to admin email.' });
   } catch (error) {
