@@ -210,6 +210,19 @@ export function handleLogin() {
     const form = document.getElementById('login-form');
     if (!form) return;
 
+    // Attach handler for "Forgot Password?" link to redirect to reset page
+    const forgotLink = document.querySelector('.forgot-password');
+    if (forgotLink) {
+        forgotLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            // Preserve typed email if present
+            const emailInput = document.getElementById('email');
+            const email = emailInput ? emailInput.value.trim() : '';
+            const target = 'reset-password.html' + (email ? `?email=${encodeURIComponent(email)}` : '');
+            window.location.href = target;
+        });
+    }
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
