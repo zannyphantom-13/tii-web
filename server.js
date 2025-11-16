@@ -184,8 +184,12 @@ app.post('/register', async (req, res) => {
   try {
     const { full_name, email, password, phone_number, date_of_birth, country, bio, security_question, security_answer } = req.body;
 
-    if (!full_name || !email || !password || !security_question || !security_answer) {
-      return res.status(400).json({ message: 'Missing required fields.' });
+    // Identify which required fields are missing and return them for better UX
+    const requiredFields = ['full_name', 'email', 'password', 'security_question', 'security_answer'];
+    const missing = requiredFields.filter(f => !req.body[f] || req.body[f].toString().trim() === '');
+    if (missing.length) {
+      console.warn('Registration attempted with missing fields:', missing);
+      return res.status(400).json({ message: 'Missing required fields.', missing_fields: missing });
     }
 
     // Check if user exists

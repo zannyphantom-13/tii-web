@@ -157,13 +157,22 @@ export function handleRegistration() {
                 const msg = result.message || 'Registration failed.';
                 if (errorElement) errorElement.textContent = `Registration Failed: ${msg}`;
 
-                // After server error, attempt to focus first missing/invalid field
-                // Re-run a light validation to find the first empty required field
-                for (const key of ['full_name','email','password','security_question','security_answer']) {
-                    if (!data[key] || data[key].toString().trim() === '') {
-                        const el = form.querySelector(`[name="${key}"]`) || document.getElementById(key);
-                        if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-                        break;
+                // If server returned which fields are missing, focus the first one
+                if (result && Array.isArray(result.missing_fields) && result.missing_fields.length) {
+                    const first = result.missing_fields[0];
+                    const el = form.querySelector(`[name="${first}"]`) || document.getElementById(first);
+                    if (el) {
+                        el.focus();
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                } else {
+                    // Fallback: attempt to focus common required fields
+                    for (const key of ['full_name','email','password','security_question','security_answer']) {
+                        if (!data[key] || data[key].toString().trim() === '') {
+                            const el = form.querySelector(`[name="${key}"]`) || document.getElementById(key);
+                            if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                            break;
+                        }
                     }
                 }
             }
