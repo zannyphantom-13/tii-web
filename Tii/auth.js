@@ -164,7 +164,10 @@ export function handleRegistration() {
                 }
             } else {
                 const msg = result.message || 'Registration failed.';
-                if (errorElement) errorElement.textContent = `Registration Failed: ${msg}`;
+                if (errorElement) {
+                    errorElement.textContent = `Registration Failed: ${msg}`;
+                    try { errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+                }
 
                 // If server returned which fields are missing, focus the first one
                 if (result && Array.isArray(result.missing_fields) && result.missing_fields.length) {
@@ -185,9 +188,12 @@ export function handleRegistration() {
                     }
                 }
             }
-        } catch (error) {
+            } catch (error) {
             console.error('Registration Network Error:', error);
-            if (errorElement) errorElement.textContent = 'A network error occurred.';
+            if (errorElement) {
+                errorElement.textContent = 'A network error occurred.';
+                try { errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+            }
         }
     });
 }

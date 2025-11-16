@@ -817,34 +817,35 @@ app.post('/api/security-question', async (req, res) => {
 
 // ============================================
 // RESET PASSWORD ENDPOINT
+// Returns structured errors with `missing_fields` or `invalid_fields` to help the client focus inputs
 // ============================================
 app.post('/reset-password', async (req, res) => {
   try {
     const { email, security_answer, new_password } = req.body;
 
-    if (!email || !security_answer || !new_password) {
-      return res.status(400).json({ message: 'Missing required fields.' });
-    }
+    // Identify missing fields and return them for UX
+    const required = ['email', 'security_answer', 'new_password'];
+    const missing = required.filter(f => !req.body[f] || req.body[f].toString().trim() === '');
+    if (missing.length) return res.status(400).json({ message: 'Missing required fields.', missing_fields: missing });
 
     // Validate new password
     if (new_password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters.' });
+      return res.status(400).json({ message: 'Password must be at least 6 characters.', missing_fields: ['new_password'] });
     }
 
     // Fetch user
     const snapshot = await db.ref(`users/${email.replace(/\./g, '_')}`).get();
     if (!snapshotExists(snapshot)) {
-      return res.status(404).json({ message: 'User not found.' });
+      return res.status(404).json({ message: 'User not found.', missing_fields: ['email'] });
     }
 
     const user = snapshotVal(snapshot);
 
     // Verify security answer
-    const userAnswer = user.security_answer.toLowerCase().trim();
-    const providedAnswer = security_answer.toLowerCase().trim();
-    
+    const userAnswer = (user.security_answer || '').toLowerCase().trim();
+    const providedAnswer = (security_answer || '').toLowerCase().trim();
     if (userAnswer !== providedAnswer) {
-      return res.status(401).json({ message: 'Security answer is incorrect.' });
+      return res.status(401).json({ message: 'Security answer is incorrect.', invalid_fields: ['security_answer'] });
     }
 
     // Hash new password
