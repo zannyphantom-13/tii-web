@@ -41,33 +41,71 @@ try {
   db = admin.database();
   console.log('Γ£à Firebase connected');
 } catch (err) {
-  console.warn('ΓÜá∩╕Å Firebase not configured. Using mock DB (in-memory storage). For production, set FIREBASE_SERVICE_ACCOUNT and FIREBASE_DATABASE_URL.');
-  
-  // In-memory mock database that persists during the session
-  const mockStore = {};
-  
+  console.warn('ΓÜá∩╕Å Firebase not configured. Falling back to file-backed persistent DB. For production, set FIREBASE_SERVICE_ACCOUNT and FIREBASE_DATABASE_URL.');
+
+  // File-backed persistent store for environments without Firebase.
+  // Data is stored as a mapping of path -> value in `persistent-db.json` at project root.
+  const fs = require('fs');
+  const PERSIST_PATH = path.join(__dirname, 'persistent-db.json');
+
+  // Load existing store or initialize empty
+  let fileStore = {};
+  try {
+    if (fs.existsSync(PERSIST_PATH)) {
+      const raw = fs.readFileSync(PERSIST_PATH, 'utf8');
+      fileStore = raw ? JSON.parse(raw) : {};
+    } else {
+      // ensure file exists
+      fs.writeFileSync(PERSIST_PATH, JSON.stringify({}, null, 2), 'utf8');
+      fileStore = {};
+    }
+  } catch (e) {
+    console.warn('Could not read or create persistent DB file, falling back to in-memory store.', e);
+    fileStore = {};
+  }
+
+  // Helper to persist the in-memory fileStore to disk (atomic replacement)
+  function persist() {
+    try {
+      fs.writeFileSync(PERSIST_PATH, JSON.stringify(fileStore, null, 2), 'utf8');
+    } catch (e) {
+      console.error('Failed to persist DB to disk:', e);
+    }
+  }
+
   db = {
-    ref: (path) => ({
+    ref: (p) => ({
       set: async (data) => {
-        mockStore[path] = data;
-        console.log(`Γ£à Mock DB set: ${path}`, data);
-        return { key: path };
+        fileStore[p] = data;
+        persist();
+        console.log(`Γ£à Persistent DB set: ${p}`);
+        return { key: p };
       },
       get: async () => {
-        const data = mockStore[path];
+        const data = fileStore[p];
         return {
-          val: () => data || null,
+          val: () => (data === undefined ? null : data),
           exists: () => data !== undefined && data !== null,
         };
       },
-      on: (event, callback) => { },
-      update: async (updates) => {
-        if (mockStore[path]) {
-          mockStore[path] = { ...mockStore[path], ...updates };
-          console.log(`Γ£à Mock DB update: ${path}`, mockStore[path]);
-        }
+      on: (event, callback) => {
+        // No real-time listeners for file store; noop
       },
-      push: async () => ({ key: 'mock-key' }),
+      update: async (updates) => {
+        if (fileStore[p]) {
+          fileStore[p] = { ...fileStore[p], ...updates };
+        } else {
+          fileStore[p] = { ...(updates || {}) };
+        }
+        persist();
+      },
+      push: async (data) => {
+        const key = `k_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+        fileStore[p] = fileStore[p] || {};
+        fileStore[p][key] = data || null;
+        persist();
+        return { key };
+      },
     }),
   };
 }
