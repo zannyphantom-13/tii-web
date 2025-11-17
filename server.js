@@ -1001,6 +1001,35 @@ app.delete('/api/courses/:id/lessons/:lessonId', async (req, res) => {
   }
 });
 
+// PUT /api/courses/:id/lessons/:lessonId (admin only) - edit lesson
+app.put('/api/courses/:id/lessons/:lessonId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    if (!token) return res.status(401).json({ message: 'Unauthorized' });
+    let decoded;
+    try { decoded = jwt.verify(token, JWT_SECRET); } catch (e) { return res.status(401).json({ message: 'Invalid token' }); }
+    if (decoded.role !== 'admin') return res.status(403).json({ message: 'Admin role required' });
+
+    const courseId = req.params.id;
+    const lessonId = req.params.lessonId;
+    const { title, content, resource_url } = req.body;
+    if (!lessonId) return res.status(400).json({ message: 'Lesson id required.' });
+
+    const updates = {};
+    if (title !== undefined) updates.title = title;
+    if (content !== undefined) updates.content = content;
+    if (resource_url !== undefined) updates.resource_url = resource_url;
+    if (Object.keys(updates).length === 0) return res.status(400).json({ message: 'No updates provided.' });
+
+    await db.ref(`courses/${courseId}/lessons/${lessonId}`).update({ ...updates, updated_at: new Date().toISOString(), updated_by: decoded.email || 'admin' });
+    res.json({ message: 'Lesson updated.' });
+  } catch (e) {
+    console.error('Edit lesson error:', e);
+    res.status(500).json({ message: 'Server error editing lesson.' });
+  }
+});
+
 app.post('/api/courses', async (req, res) => {
   try {
     const authHeader = req.headers.authorization || '';

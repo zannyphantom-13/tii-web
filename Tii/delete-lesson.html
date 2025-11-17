@@ -38,11 +38,33 @@
         container.innerHTML='';
         lessons.forEach(l=>{
           const div = document.createElement('div'); div.style.display='flex'; div.style.justifyContent='space-between'; div.style.alignItems='center'; div.style.padding='10px'; div.style.border='1px solid #eee'; div.style.borderRadius='6px'; div.style.marginBottom='8px';
-          div.innerHTML = `<div><strong>${escapeHtml(l.title)}</strong><div style="color:#666">${(l.content||'').slice(0,200)}${(l.content||'').length>200?'...':''}</div></div>`;
-          const btn = document.createElement('button'); btn.textContent='Delete'; btn.style.background='#c0392b'; btn.style.color='#fff'; btn.style.border='none'; btn.style.padding='8px 10px'; btn.style.borderRadius='4px'; btn.addEventListener('click', ()=> deleteLesson(courseId, l.id));
-          div.appendChild(btn); container.appendChild(div);
+          const left = document.createElement('div');
+          left.innerHTML = `<strong>${escapeHtml(l.title)}</strong><div style="color:#666">${(l.content||'').slice(0,200)}${(l.content||'').length>200?'...':''}</div>`;
+          const actions = document.createElement('div');
+          // Edit button
+          const editBtn = document.createElement('button'); editBtn.textContent='Edit'; editBtn.style.background='#2a6e62'; editBtn.style.color='#fff'; editBtn.style.border='none'; editBtn.style.padding='8px 10px'; editBtn.style.borderRadius='4px'; editBtn.style.marginRight='8px';
+          editBtn.addEventListener('click', ()=> openEditModal(courseId, l.id, l.title, l.content, l.resource_url));
+          // Delete button
+          const delBtn = document.createElement('button'); delBtn.textContent='Delete'; delBtn.style.background='#c0392b'; delBtn.style.color='#fff'; delBtn.style.border='none'; delBtn.style.padding='8px 10px'; delBtn.style.borderRadius='4px';
+          delBtn.addEventListener('click', ()=> deleteLesson(courseId, l.id));
+          actions.appendChild(editBtn); actions.appendChild(delBtn);
+          div.appendChild(left); div.appendChild(actions); container.appendChild(div);
         });
       }catch(e){ container.innerHTML='Network error loading lessons.'; }
+    }
+    // --- Edit modal (simple prompt-based) ---
+    async function openEditModal(courseId, lessonId, title, content, resource_url){
+      const newTitle = prompt('Edit lesson title:', title || '');
+      if (newTitle === null) return; // cancelled
+      const newContent = prompt('Edit lesson content:', content || '');
+      if (newContent === null) return;
+      const newResource = prompt('Edit resource URL (leave blank to clear):', resource_url || '');
+      if (newResource === null) return;
+      const token = localStorage.getItem('authToken'); const msgEl = document.getElementById('delete-lesson-message'); msgEl.textContent=''; if(!token){ msgEl.style.color='#c0392b'; msgEl.textContent='You must be logged in as admin.'; return; }
+      try{
+        const r = await fetch(`${API_URL}/api/courses/${courseId}/lessons/${lessonId}`, { method:'PUT', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+token }, body: JSON.stringify({ title: newTitle, content: newContent, resource_url: newResource }) });
+        const data = await r.json(); if(r.ok){ msgEl.style.color='#2a6e62'; msgEl.textContent='Lesson updated.'; loadLessons(); } else { msgEl.style.color='#c0392b'; msgEl.textContent = data.message || 'Failed to update lesson.'; }
+      }catch(e){ msgEl.style.color='#c0392b'; msgEl.textContent='Network error.'; }
     }
     async function deleteLesson(courseId, lessonId){ if(!confirm('Delete this lesson?')) return; const msgEl = document.getElementById('delete-lesson-message'); msgEl.textContent=''; const token = localStorage.getItem('authToken'); if(!token){ msgEl.style.color='#c0392b'; msgEl.textContent='You must be logged in as admin.'; return; }
       try{
