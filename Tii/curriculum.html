@@ -80,6 +80,13 @@
                 const grid = document.querySelector('.other-courses-grid');
                 if (!grid) return;
 
+                // Badge configuration: can be overridden by setting
+                // window.ADDED_BADGE_TEXT and window.ADDED_BADGE_BG (hex or css color)
+                const ADDED_BADGE_TEXT = (window.ADDED_BADGE_TEXT && String(window.ADDED_BADGE_TEXT)) || 'Added';
+                if (window.ADDED_BADGE_BG) {
+                    try { document.documentElement.style.setProperty('--added-badge-bg', window.ADDED_BADGE_BG); } catch(e){}
+                }
+
                 // Helper to create a card for a course (with thumbnail placeholder, badge, and admin Manage button)
                 function createCourseCard(c){
                     const a = document.createElement('a');
@@ -92,7 +99,7 @@
                         a.classList.add('uploaded');
                         const badge = document.createElement('span');
                         badge.className = 'course-badge';
-                        badge.textContent = 'Added';
+                        badge.textContent = ADDED_BADGE_TEXT;
                         a.appendChild(badge);
                     }
 
@@ -105,7 +112,7 @@
                     const img = document.createElement('img');
                     img.src = thumb || placeholder;
                     img.alt = c.title || 'course';
-                    img.style.height = '120px';
+                    // let CSS control image sizing to keep responsive behavior consistent
                     img.style.objectFit = 'cover';
                     img.style.borderRadius = '6px';
                     img.style.marginBottom = '10px';

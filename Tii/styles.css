@@ -14,6 +14,13 @@ body {
     flex-direction: column;
 }
 
+:root {
+    --added-badge-bg: #ff8a65; /* orange-ish default */
+    --added-badge-color: #ffffff;
+    --course-card-gap: 18px;
+    --course-card-padding: 18px;
+}
+
 a {
     text-decoration: none;
     color: inherit;
@@ -367,15 +374,15 @@ main {
 /* --- Other Courses Card Grid --- */
 .other-courses-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--course-card-gap, 18px);
     max-width: 1100px;
     margin: 20px auto;
 }
 
 .other-course-card {
     background: linear-gradient(180deg, #ffffff 0%, #fbfdfa 50%, #f5fffb 100%);
-    padding: 18px;
+    padding: var(--course-card-padding, 18px);
     border-radius: 10px;
     border: 2px solid rgba(42,110,98,0.12);
     box-shadow: 0 8px 20px rgba(31,80,71,0.08);
@@ -397,8 +404,8 @@ main {
     position: absolute;
     top: 12px;
     right: 12px;
-    background: linear-gradient(90deg,#ffb74d,#ff8a65);
-    color: #fff;
+    background: linear-gradient(90deg, var(--added-badge-bg, #ffb74d), var(--added-badge-bg, #ff8a65));
+    color: var(--added-badge-color, #fff);
     padding: 6px 8px;
     font-size: 12px;
     border-radius: 999px;
