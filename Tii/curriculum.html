@@ -40,13 +40,33 @@
         <div style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
             <h2 style="text-align: center; margin-bottom: 24px; color: #2a6e62;">Curriculum</h2>
             <p style="text-align:center; color:#555; margin-bottom:18px;">Below is a list of existing courses. You can upload lessons to any course.</p>
-            <ul class="course-list" style="width: 100%; max-width: 500px; margin: 0 auto; text-align: center;">
-                <li><a class="course-button" style="justify-content: center;" href="courses/programming.html">Programming <i class="fa fa-arrow-right"></i></a></li>
-                <li><a class="course-button" style="justify-content: center;" href="courses/data-analysis.html">Data Analysis <i class="fa fa-arrow-right"></i></a></li>
-                <li><a class="course-button" style="justify-content: center;" href="courses/drug-discovery.html">Drug Discovery <i class="fa fa-arrow-right"></i></a></li>
-                <li><a class="course-button" style="justify-content: center;" href="courses/computational-chemistry.html">Computational Chemistry <i class="fa fa-arrow-right"></i></a></li>
-                <li><a class="course-button" style="justify-content: center;" href="courses/bioinformatics.html">Bioinformatics <i class="fa fa-arrow-right"></i></a></li>
-            </ul>
+            <div class="other-courses-grid" aria-label="Existing courses">
+                <a class="other-course-card" href="courses/programming.html" title="Programming">
+                    <h4>Programming</h4>
+                    <p>Hands-on programming fundamentals and practical coding projects.</p>
+                    <span class="explore-btn-secondary" style="display:inline-block;width:auto;padding:8px 14px;margin-top:12px">Open</span>
+                </a>
+                <a class="other-course-card" href="courses/data-analysis.html" title="Data Analysis">
+                    <h4>Data Analysis</h4>
+                    <p>Learn how to collect, clean, visualize, and interpret data.</p>
+                    <span class="explore-btn-secondary" style="display:inline-block;width:auto;padding:8px 14px;margin-top:12px">Open</span>
+                </a>
+                <a class="other-course-card" href="courses/drug-discovery.html" title="Drug Discovery">
+                    <h4>Drug Discovery</h4>
+                    <p>Explore computational approaches to identifying therapeutic candidates.</p>
+                    <span class="explore-btn-secondary" style="display:inline-block;width:auto;padding:8px 14px;margin-top:12px">Open</span>
+                </a>
+                <a class="other-course-card" href="courses/computational-chemistry.html" title="Computational Chemistry">
+                    <h4>Computational Chemistry</h4>
+                    <p>Modeling and simulation techniques for chemical systems.</p>
+                    <span class="explore-btn-secondary" style="display:inline-block;width:auto;padding:8px 14px;margin-top:12px">Open</span>
+                </a>
+                <a class="other-course-card" href="courses/bioinformatics.html" title="Bioinformatics">
+                    <h4>Bioinformatics</h4>
+                    <p>Computational analysis of biological sequence and omics data.</p>
+                    <span class="explore-btn-secondary" style="display:inline-block;width:auto;padding:8px 14px;margin-top:12px">Open</span>
+                </a>
+            </div>
         </div>
         <script>
         // Fetch persisted courses that have placement === 'curriculum' and append them
