@@ -34,7 +34,7 @@
       </div>
       <div class="form-group">
         <label for="lesson-date">Date & Time <small>(optional)</small></label>
-        <input id="lesson-date" name="date" type="datetime-local" />
+        <input id="lesson-date" name="date" type="datetime-local" autocomplete="off" />
       </div>
       <div class="form-group">
         <label for="lesson-other">Other info</label>
@@ -150,27 +150,26 @@
               // server suggests base64 fallback
               const dataUrl = await readFileAsDataURL(imgFile);
               const base = await fetch(`${API_URL}/api/uploads/lessons/base64`, { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ filename: imgFile.name, data: dataUrl }) });
-              if (!base.ok) { const body = await base.json().catch(()=>({})); throw new Error(body.message || 'Base64 upload failed'); }
-              const jb = await base.json(); image_url = jb.url || '';
+              if (base.ok) { const jb = await base.json(); image_url = jb.url || ''; }
             } else if (up.ok) {
               const ju = await up.json(); image_url = ju.url || '';
             } else {
               // try base64 fallback
               const dataUrl = await readFileAsDataURL(imgFile);
               const base = await fetch(`${API_URL}/api/uploads/lessons/base64`, { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + token }, body: JSON.stringify({ filename: imgFile.name, data: dataUrl }) });
-              if (!base.ok) { const body = await base.json().catch(()=>({})); throw new Error(body.message || 'Image upload failed'); }
-              const jb = await base.json(); image_url = jb.url || '';
+              if (base.ok) { const jb = await base.json(); image_url = jb.url || ''; }
             }
           } catch (ue) {
             msgEl.style.color='#c0392b'; msgEl.textContent = 'Image upload failed: ' + (ue && ue.message ? ue.message : '');
-            return;
+            // continue without image_url
           }
         }
         const order = Number(document.getElementById('lesson-order').value || 0);
         const published = !!document.getElementById('lesson-published').checked;
         const topic = document.getElementById('lesson-topic').value.trim();
         const weeks = document.getElementById('lesson-weeks').value.trim();
-        const date = document.getElementById('lesson-date').value;
+        let date = document.getElementById('lesson-date').value;
+        if (!date) date = '';
         const other_info = document.getElementById('lesson-other').value.trim();
         const resp = await fetch(`${API_URL}/api/courses/${courseId}/lessons`,{
           method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}, body:JSON.stringify({ title, content, resource_url, order, published, topic, weeks, date, other_info, image_url })
