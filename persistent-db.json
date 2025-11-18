@@ -1,12 +1,81 @@
 {
-	"courses": {
-		"c_test_1": {
-			"title": "Intro to Applied Informatics",
-			"description": "A short test course to verify the other-courses listing and styles. Covers data basics and tools.",
-			"url": "https://example.com/intro-informatics",
-			"placement": "other",
-			"created_at": "2025-11-17T00:00:00.000Z",
-			"created_by": "system-test"
-		}
-	}
+  "courses": {
+    "c_test_1": {
+      "title": "Intro to Applied Informatics",
+      "description": "A short test course to verify the other-courses listing and styles. Covers data basics and tools.",
+      "url": "https://example.com/intro-informatics",
+      "placement": "other",
+      "created_at": "2025-11-17T00:00:00.000Z",
+      "created_by": "system-test"
+    },
+    "chemistry": {
+      "title": "Computational Chemistry",
+      "description": "A pathway exploring computational approaches in chemistry.",
+      "url": "/Tii/courses/chemistry.html",
+      "placement": "curriculum",
+      "created_at": "2025-11-18T00:00:00.000Z",
+      "created_by": "debug",
+      "lessons": {
+        "l_debug_1": {
+          "title": "Debug Lesson: Intro",
+          "content": "This is a test lesson added directly to persistent DB for chemistry.",
+          "topic": "Intro",
+          "weeks": "Week 1",
+          "date": "2025-11-18 10:00",
+          "other_info": "Inserted by test",
+          "resource_url": "",
+          "image_url": "",
+          "order": 1,
+          "published": true,
+          "created_at": "2025-11-18T10:00:00.000Z",
+          "created_by": "debug"
+        },
+        "dl_1763454439651_maaq3q": {
+          "title": "Test Lesson (debug)",
+          "content": "This is a debug lesson created by the test endpoint.",
+          "topic": "Intro",
+          "weeks": "Week 1",
+          "date": "2025-11-18 10:00",
+          "other_info": "debug test",
+          "resource_url": "",
+          "image_url": "",
+          "order": 5,
+          "published": true,
+          "created_at": "2025-11-18T08:27:19.653Z",
+          "created_by": "debug"
+        }
+      }
+    }
+  }
+  ,
+  "courses/chemistry/lessons": {
+    "l_debug_1": {
+      "title": "Debug Lesson: Intro",
+      "content": "This is a test lesson added directly to persistent DB for chemistry.",
+      "topic": "Intro",
+      "weeks": "Week 1",
+      "date": "2025-11-18 10:00",
+      "other_info": "Inserted by test",
+      "resource_url": "",
+      "image_url": "",
+      "order": 1,
+      "published": true,
+      "created_at": "2025-11-18T10:00:00.000Z",
+      "created_by": "debug"
+    },
+    "dl_1763454439651_maaq3q": {
+      "title": "Test Lesson (debug)",
+      "content": "This is a test lesson created by the test endpoint.",
+      "topic": "Intro",
+      "weeks": "Week 1",
+      "date": "2025-11-18 10:00",
+      "other_info": "debug test",
+      "resource_url": "",
+      "image_url": "",
+      "order": 5,
+      "published": true,
+      "created_at": "2025-11-18T08:27:19.653Z",
+      "created_by": "debug"
+    }
+  }
 }

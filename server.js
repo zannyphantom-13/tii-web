@@ -98,16 +98,77 @@ try {
     }
   }
 
+  // Helpers to work with nested paths like 'courses/chemistry/lessons'
+  function pathParts(p) {
+    if (!p) return [];
+    return p.split('/').filter(Boolean);
+  }
+
+  function getAtPath(p) {
+    const parts = pathParts(p);
+    if (parts.length === 0) return fileStore;
+    let node = fileStore;
+    for (let i = 0; i < parts.length; i++) {
+      if (node === undefined || node === null) return undefined;
+      node = node[parts[i]];
+    }
+    return node;
+  }
+
+  function setAtPath(p, value) {
+    const parts = pathParts(p);
+    if (parts.length === 0) {
+      fileStore = value || {};
+      return;
+    }
+    let node = fileStore;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const k = parts[i];
+      if (typeof node[k] !== 'object' || node[k] === null) node[k] = {};
+      node = node[k];
+    }
+    node[parts[parts.length - 1]] = value;
+  }
+
+  function updateAtPath(p, updates) {
+    const existing = getAtPath(p);
+    if (existing && typeof existing === 'object') {
+      setAtPath(p, { ...existing, ...(updates || {}) });
+    } else {
+      setAtPath(p, { ...(updates || {}) });
+    }
+  }
+
+  async function pushAtPath(p, data) {
+    const parts = pathParts(p);
+    let node = fileStore;
+    for (let i = 0; i < parts.length; i++) {
+      const k = parts[i];
+      if (i === parts.length - 1) {
+        if (typeof node[k] !== 'object' || node[k] === null) node[k] = {};
+        const key = `k_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+        node[k][key] = data || null;
+        return key;
+      }
+      if (typeof node[k] !== 'object' || node[k] === null) node[k] = {};
+      node = node[k];
+    }
+    // If p is empty, push at root
+    const key = `k_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    fileStore[key] = data || null;
+    return key;
+  }
+
   db = {
     ref: (p) => ({
       set: async (data) => {
-        fileStore[p] = data;
+        setAtPath(p, data);
         persist();
         console.log(`Γ£à Persistent DB set: ${p}`);
         return { key: p };
       },
       get: async () => {
-        const data = fileStore[p];
+        const data = getAtPath(p);
         return {
           val: () => (data === undefined ? null : data),
           exists: () => data !== undefined && data !== null,
@@ -117,17 +178,11 @@ try {
         // No real-time listeners for file store; noop
       },
       update: async (updates) => {
-        if (fileStore[p]) {
-          fileStore[p] = { ...fileStore[p], ...updates };
-        } else {
-          fileStore[p] = { ...(updates || {}) };
-        }
+        updateAtPath(p, updates);
         persist();
       },
       push: async (data) => {
-        const key = `k_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
-        fileStore[p] = fileStore[p] || {};
-        fileStore[p][key] = data || null;
+        const key = await pushAtPath(p, data);
         persist();
         return { key };
       },
@@ -1219,6 +1274,66 @@ app.post('/api/uploads/lessons/debug', async (req, res) => {
   } catch (e) {
     console.error('Debug base64 upload error:', e);
     res.status(500).json({ message: 'Server error saving debug image.' });
+  }
+});
+
+// DEBUG: unauthenticated endpoint to create a lesson for testing (local only)
+// POST /api/debug/courses/:id/lessons { title, content, topic, weeks, date, other_info, resource_url, image_url, order, published }
+app.post('/api/debug/courses/:id/lessons', async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { title, content, topic, weeks, date, other_info, resource_url, image_url } = req.body;
+    if (!title) return res.status(400).json({ message: 'title required' });
+    const lessonId = `dl_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    const lesson = {
+      title,
+      content: content || '',
+      topic: topic || '',
+      weeks: weeks || '',
+      date: date || '',
+      other_info: other_info || '',
+      resource_url: resource_url || '',
+      image_url: image_url || '',
+      order: (typeof req.body.order === 'number') ? req.body.order : (req.body.order ? Number(req.body.order) : 0),
+      published: req.body.published === true || req.body.published === 'true' ? true : false,
+      created_at: new Date().toISOString(),
+      created_by: 'debug'
+    };
+    await db.ref(`courses/${courseId}/lessons/${lessonId}`).set(lesson);
+    return res.status(201).json({ id: lessonId, ...lesson });
+  } catch (e) {
+    console.error('Debug create lesson error:', e);
+    return res.status(500).json({ message: 'Server error creating debug lesson.' });
+  }
+});
+
+// DEBUG: unauthenticated lesson creation for local testing only
+// POST /api/courses/:id/lessons/debug { title, content, resource_url, weeks, topic, date, other_info, image_url, order, published }
+app.post('/api/courses/:id/lessons/debug', async (req, res) => {
+  try {
+    const courseId = req.params.id;
+    const { title, content, resource_url, weeks, topic, date, other_info, image_url } = req.body;
+    if (!title) return res.status(400).json({ message: 'Title required for debug lesson.' });
+    const lessonId = `l_debug_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+    const lesson = {
+      title,
+      content: content || '',
+      resource_url: resource_url || '',
+      weeks: weeks || '',
+      topic: topic || '',
+      date: date || '',
+      other_info: other_info || '',
+      image_url: image_url || '',
+      order: (typeof req.body.order === 'number') ? req.body.order : (req.body.order ? Number(req.body.order) : 0),
+      published: req.body.published === true || req.body.published === 'true' ? true : false,
+      created_at: new Date().toISOString(),
+      created_by: 'debug'
+    };
+    await db.ref(`courses/${courseId}/lessons/${lessonId}`).set(lesson);
+    res.status(201).json({ id: lessonId, ...lesson });
+  } catch (e) {
+    console.error('Debug create lesson error:', e);
+    res.status(500).json({ message: 'Server error creating debug lesson.' });
   }
 });
 
