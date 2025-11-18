@@ -80,7 +80,7 @@
                 const grid = document.querySelector('.other-courses-grid');
                 if (!grid) return;
 
-                // Helper to create a card for a course
+                // Helper to create a card for a course (with thumbnail placeholder, badge, and admin Manage button)
                 function createCourseCard(c){
                     const a = document.createElement('a');
                     a.className = 'other-course-card';
@@ -96,23 +96,43 @@
                         a.appendChild(badge);
                     }
 
-                    // Optional thumbnail support
+                    // Placeholder SVG (inline via data URL) used when no thumbnail provided
+                    const placeholderSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="%23f3fff6"/><g fill="%232a6e62" opacity="0.08"><rect x="0" y="0" width="640" height="360"/></g><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%232a6e62" font-family="Arial, sans-serif" font-size="28">Course Image</text></svg>';
+                    const placeholder = 'data:image/svg+xml;utf8,' + encodeURIComponent(placeholderSvg);
+
+                    // Thumbnail support (thumbnail, image_url, icon) — fallback to placeholder
                     const thumb = c.thumbnail || c.image_url || c.icon || '';
-                    if (thumb) {
-                        const img = document.createElement('img');
-                        img.src = thumb;
-                        img.alt = c.title || 'course';
-                        img.style.height = '120px';
-                        img.style.objectFit = 'cover';
-                        img.style.borderRadius = '6px';
-                        img.style.marginBottom = '10px';
-                        a.appendChild(img);
-                    }
+                    const img = document.createElement('img');
+                    img.src = thumb || placeholder;
+                    img.alt = c.title || 'course';
+                    img.style.height = '120px';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '6px';
+                    img.style.marginBottom = '10px';
+                    a.appendChild(img);
 
                     const h = document.createElement('h4'); h.textContent = c.title || 'Untitled';
                     const p = document.createElement('p'); p.textContent = c.description || '';
                     const btn = document.createElement('span'); btn.className = 'explore-btn-secondary'; btn.style.display='inline-block'; btn.style.width='auto'; btn.style.padding='8px 14px'; btn.style.marginTop='12px'; btn.textContent = 'Open';
                     a.appendChild(h); a.appendChild(p); a.appendChild(btn);
+
+                    // Admin-only Manage button for uploaded courses: visible when auth token exists
+                    if (a.classList.contains('uploaded')){
+                        const token = localStorage.getItem('authToken');
+                        if (token && c.id){
+                            const manageBtn = document.createElement('button');
+                            manageBtn.className = 'manage-btn';
+                            manageBtn.textContent = 'Manage';
+                            manageBtn.onclick = function(e){
+                                e.preventDefault(); e.stopPropagation();
+                                // navigate to admin portal edit view
+                                window.location.href = '/Tii/admin-portal.html?edit_course=' + encodeURIComponent(c.id);
+                            };
+                            // Place the manage button in the card (absolute positioned by CSS)
+                            a.appendChild(manageBtn);
+                        }
+                    }
+
                     return a;
                 }
 
