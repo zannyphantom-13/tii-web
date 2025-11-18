@@ -1233,7 +1233,7 @@ app.post('/api/courses', async (req, res) => {
     }
     if (decoded.role !== 'admin') return res.status(403).json({ message: 'Admin role required' });
 
-    const { title, description, url, placement } = req.body;
+    const { title, description, url, placement, thumbnail } = req.body;
     if (!title || !description) return res.status(400).json({ message: 'Title and description required.' });
 
     const id = `c_${Date.now()}`;
@@ -1241,7 +1241,8 @@ app.post('/api/courses', async (req, res) => {
       title,
       description,
       url: url || '',
-      placement: placement || 'other',
+      placement: placement || 'curriculum',
+      thumbnail: thumbnail || '',
       created_at: new Date().toISOString(),
       created_by: decoded.email || 'admin',
     };
@@ -1368,7 +1369,20 @@ app.delete('/api/courses/:id', async (req, res) => {
     const id = req.params.id;
     if (!id) return res.status(400).json({ message: 'Course id required.' });
 
+    // Remove course data from DB
     await db.ref(`courses/${id}`).set(null);
+
+    // Attempt to remove any locally generated HTML page for this course
+    try {
+      const filePath = path.join(COURSES_DIR, `${id}.html`);
+      if (fs.existsSync(filePath)) {
+        await fs.promises.unlink(filePath);
+        console.log(`Removed generated course page: ${filePath}`);
+      }
+    } catch (e) {
+      console.warn('Failed to delete generated course file:', e && e.message ? e.message : e);
+    }
+
     res.json({ message: 'Course deleted.' });
   } catch (error) {
     console.error('Delete course error:', error);
