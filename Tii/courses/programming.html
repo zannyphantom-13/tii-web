@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Programming — The Informatics Initiative</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <a href="../index.html"><div class="logo-container"><h1>THE INFORMATICS INITIATIVE</h1></div></a>
+        <nav class="main-nav">
+            <a href="../curriculum.html">Curriculum</a>
+            <a href="../lessons.html">Weekly Lessons</a>
+            <a href="../portal.html">Student Portal</a>
+            <a href="../feedback.html">Feedback</a>
+        </nav>
+        <a id="auth-button" href="../login.html" class="login-btn">Login</a>
+    </header>
+
+    <main>
+        <h2>Programming</h2>
+        <p id="course-description">Foundational and applied programming for informatics.</p>
+        <div id="course-actions"></div>
+        <div id="lessons">Loading lessons...</div>
+    </main>
+
+    <footer><p>&copy; 2024 The Informatics Initiative</p></footer>
+
+    <script>
+    (async function(){
+        const COURSE_ID = 'programming';
+        const apiBase = window.location.origin || 'http://localhost:3000';
+        const rl = document.getElementById('lessons');
+        try{
+            const res = await fetch(`${apiBase}/api/courses/${COURSE_ID}/lessons`);
+            if(!res.ok) return rl.innerHTML = '<p>Failed to load lessons.</p>';
+            const data = await res.json();
+            const list = data.lessons || data;
+            if(!list || !list.length) return rl.innerHTML = '<p>No lessons yet.</p>';
+            rl.innerHTML = '';
+            list.forEach(ls => {
+                const card = document.createElement('div');
+                card.className = 'lesson-card';
+                card.innerHTML = `<h3>${ls.title}</h3><div>${ls.content||''}</div>`;
+                rl.appendChild(card);
+            });
+        }catch(e){ rl.innerHTML = '<p>Error loading lessons.</p>'; console.error(e) }
+
+        const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+        if(token) document.getElementById('course-actions').innerHTML = `<a class="btn" href="../upload-lesson.html?course=${COURSE_ID}">Add Lesson</a> <a class="btn" href="../delete-lesson.html?course=${COURSE_ID}">Manage Lessons</a>`;
+    })();
+    </script>
+    <script type="module">
+        import { handleAuthButton, updatePortalLink } from '../auth.js';
+        updatePortalLink(); handleAuthButton();
+    </script>
+</body>
+</html>
