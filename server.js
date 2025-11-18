@@ -48,6 +48,33 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // This makes files available at /Tii/<filename>
 app.use('/Tii', express.static(path.join(__dirname, 'Tii')));
 
+// Dynamic course page route: if a generated course HTML doesn't exist yet, generate it on demand
+app.get('/Tii/courses/:id.html', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const filePath = path.join(COURSES_DIR, `${id}.html`);
+    // If file exists, let static middleware serve it (or send it now)
+    if (fs.existsSync(filePath)) return res.sendFile(filePath);
+
+    // Otherwise, attempt to generate from DB
+    const snapshot = await db.ref(`courses/${id}`).get();
+    const course = snapshotVal(snapshot);
+    if (!course) return res.status(404).send('Course not found');
+
+    // Ensure url is set to the generated path in DB
+    const pagePath = `/Tii/courses/${id}.html`;
+    try { await db.ref(`courses/${id}`).update({ url: pagePath }); } catch (e) { /* ignore */ }
+
+    await generateCoursePage(id, course);
+    // Send the generated file
+    if (fs.existsSync(filePath)) return res.sendFile(filePath);
+    return res.status(500).send('Failed to generate course page');
+  } catch (e) {
+    console.error('Error generating/serving dynamic course page', e);
+    return res.status(500).send('Server error');
+  }
+});
+
 // ============================================
 // FIREBASE REALTIME DB SETUP (use admin SDK or REST)
 // For free tier: use Firebase REST API or install firebase-admin
@@ -1440,7 +1467,7 @@ async function generateCoursePage(id, course) {
       <div class="lesson-list" id="lesson-list">
         <p style="color:#666">Loading lessons…</p>
       </div>
-      <div style="margin-top:24px;"><a class="explore-btn-secondary" href="/Tii/other-courses.html">Back to courses</a></div>
+      <div style="margin-top:24px;"><a class="explore-btn-secondary" href="/Tii/curriculum.html">Back to courses</a></div>
     </div>
   </main>
   <script>
