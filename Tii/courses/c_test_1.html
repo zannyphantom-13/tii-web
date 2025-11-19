@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Intro to Applied Informatics — The Informatics Initiative</title>
+  <link rel="stylesheet" href="/Tii/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+  <header>
+    <a href="/Tii/index.html"><div class="logo-container"><h1>THE INFORMATICS INITIATIVE</h1></div></a>
+    <nav class="main-nav">
+      <a href="/Tii/curriculum.html">Curriculum</a>
+      <a href="/Tii/lessons.html">Weekly Lessons</a>
+      <a href="/Tii/portal.html">Student Portal</a>
+      <a href="/Tii/feedback.html">Feedback</a>
+    </nav>
+    <a id="auth-button" href="/Tii/login.html" class="login-btn">Login</a>
+  </header>
+
+  <main>
+    <div class="course-hero">
+      <h1 style="color: #d32f2f;">Intro to Applied Informatics</h1>
+      <div class="course-meta" style="color: #d32f2f;">other • Added by system-test</div>
+      <div class="course-body" id="course-description">A short test course to verify the other-courses listing and styles. Covers data basics and tools.</div>
+      <div id="course-actions" style="margin-top:12px;"></div>
+      <div id="lessons" class="lesson-list">Loading lessons...</div>
+    </div>
+  </main>
+
+  <footer><p>&copy; 2025 The Informatics Initiative</p></footer>
+
+  <script>
+  (async function(){
+    const COURSE_ID = 'c_test_1';
+    const apiBase = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : 'http://localhost:3000';
+    const rl = document.getElementById('lessons');
+
+    function renderLessons(list){
+      if(!list || !list.length){ rl.innerHTML = '<p>No lessons yet.</p>'; return; }
+      rl.innerHTML = '';
+      list.forEach(ls => {
+        const card = document.createElement('div');
+        card.className = 'lesson-card';
+
+        const summaryBtn = document.createElement('button');
+        summaryBtn.type = 'button';
+        summaryBtn.className = 'lesson-summary-btn btn';
+        summaryBtn.setAttribute('aria-expanded','false');
+        summaryBtn.textContent = ls.title || 'Untitled';
+
+        const meta = document.createElement('div');
+        meta.className = 'lesson-meta';
+        const metaParts = [];
+        if (ls.topic) metaParts.push('Topic: ' + ls.topic);
+        if (ls.weeks) metaParts.push('Weeks: ' + ls.weeks);
+        if (ls.date) metaParts.push('Date: ' + ls.date);
+        meta.textContent = metaParts.join(' | ');
+
+        const preview = document.createElement('div');
+        preview.className = 'lesson-preview';
+        preview.style.color = '#666';
+        preview.style.marginTop = '8px';
+        preview.textContent = ls.other_info || (ls.content ? (ls.content.length > 140 ? ls.content.slice(0,140) + '...' : ls.content) : '');
+
+        const details = document.createElement('div');
+        details.className = 'lesson-details';
+        details.style.display = 'none';
+        if (ls.image_url) {
+          const img = document.createElement('img'); img.src = ls.image_url; img.alt = ls.title || ''; img.className = 'lesson-img'; details.appendChild(img);
+        }
+        if (ls.resource_url) {
+          const a = document.createElement('a'); a.href = ls.resource_url; a.target = '_blank'; a.className = 'lesson-resource explore-btn-secondary'; a.textContent = 'Open Resource'; details.appendChild(a);
+        }
+        const fullContent = document.createElement('div'); fullContent.style.marginTop='8px'; fullContent.innerHTML = (ls.content || '').replace(/
+/g,'<br/>'); details.appendChild(fullContent);
+
+        summaryBtn.addEventListener('click', ()=>{
+          const expanded = summaryBtn.getAttribute('aria-expanded') === 'true';
+          summaryBtn.setAttribute('aria-expanded', String(!expanded));
+          details.style.display = expanded ? 'none' : 'block';
+        });
+
+        card.appendChild(summaryBtn);
+        card.appendChild(meta);
+        card.appendChild(preview);
+        card.appendChild(details);
+        rl.appendChild(card);
+      });
+    }
+
+    try{
+      const res = await fetch(apiBase + '/api/courses/' + COURSE_ID + '/lessons');
+      if(res.ok){
+        const data = await res.json();
+        renderLessons(data.lessons || data);
+      } else {
+        rl.innerHTML = '<p>Failed to load lessons.</p>';
+      }
+    }catch(e){ rl.innerHTML = '<p>Error loading lessons.</p>'; console.error(e); }
+
+    const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+    if(token){
+      const actions = document.getElementById('course-actions');
+      if(actions) actions.innerHTML = '';
+    }
+  })();
+  </script>
+
+  <script type="module">
+    import { handleAuthButton, updatePortalLink } from '/Tii/auth.js';
+    updatePortalLink(); handleAuthButton();
+  </script>
+</body>
+</html>

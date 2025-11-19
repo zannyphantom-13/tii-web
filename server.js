@@ -8,6 +8,7 @@ const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
+const crypto = require('crypto');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -46,7 +47,49 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Serve frontend static files from the Tii/ directory
 // This makes files available at /Tii/<filename>
-app.use('/Tii', express.static(path.join(__dirname, 'Tii')));
+// Protect selected admin/user pages by requiring a valid JWT (Authorization: Bearer <token>)
+// or ?token=<jwt> query param. Unauthenticated visitors will be redirected to login.
+app.use('/Tii', async (req, res, next) => {
+  try {
+    const protectedFiles = [
+      '/admin-portal.html',
+      '/admin-profile.html',
+      '/admin-portal.html',
+      '/ad-manager.html',
+      '/ad-upload.html',
+      '/upload-course.html',
+      '/upload-lesson.html',
+      '/profile.html',
+      '/portal.html',
+      '/assignments.html'
+    ];
+    const reqPath = req.path || '';
+    // Check whether this request targets a protected filename
+    const needsAuth = protectedFiles.some(p => reqPath === p || reqPath.startsWith(p));
+    if (!needsAuth) return next();
+
+    // Accept token from Authorization header (Bearer) or ?token=<jwt>
+    const authHeader = req.headers.authorization || req.headers.Authorization || '';
+    let token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    if (!token && req.query && req.query.token) token = req.query.token;
+
+    if (!token) {
+      // Redirect to login page with original url as next parameter
+      const nextUrl = encodeURIComponent(req.originalUrl || reqPath);
+      return res.redirect(`/Tii/login.html?next=${nextUrl}`);
+    }
+
+    try {
+      jwt.verify(token, JWT_SECRET);
+      return next();
+    } catch (e) {
+      const nextUrl = encodeURIComponent(req.originalUrl || reqPath);
+      return res.redirect(`/Tii/login.html?next=${nextUrl}`);
+    }
+  } catch (e) {
+    return next();
+  }
+}, express.static(path.join(__dirname, 'Tii')));
 
 // Dynamic course page route: if a generated course HTML doesn't exist yet, generate it on demand
 app.get('/Tii/courses/:id.html', async (req, res) => {
@@ -778,9 +821,37 @@ const sseClients = new Set();
 // Comment SSE clients (for real-time comment notifications)
 const commentSseClients = new Set();
 
+// Generic event SSE clients (courses, lessons, comments, tokens, etc.)
+const eventSseClients = new Set();
+
+// Helper to strip deletion tokens from any object before broadcasting over SSE
+function stripDeletionTokens(obj) {
+  if (!obj || typeof obj !== 'object') return;
+  if (Array.isArray(obj)) return obj.forEach(stripDeletionTokens);
+  if (Object.prototype.hasOwnProperty.call(obj, 'deletion_token')) delete obj.deletion_token;
+  Object.keys(obj).forEach(k => {
+    try { if (obj[k] && typeof obj[k] === 'object') stripDeletionTokens(obj[k]); } catch (e) { /* ignore */ }
+  });
+}
+
+async function broadcastEvent(payload) {
+  try {
+    const safe = JSON.parse(JSON.stringify(payload));
+    stripDeletionTokens(safe);
+    const msg = `data: ${JSON.stringify(safe)}\n\n`;
+    eventSseClients.forEach(res => {
+      try { res.write(msg); } catch (e) { /* ignore write errors */ }
+    });
+  } catch (e) {
+    console.warn('Failed to broadcast event', e && e.message ? e.message : e);
+  }
+}
+
 async function broadcastCommentUpdate(payload) {
   try {
-    const msg = `data: ${JSON.stringify(payload)}\n\n`;
+    const safe = JSON.parse(JSON.stringify(payload));
+    stripDeletionTokens(safe);
+    const msg = `data: ${JSON.stringify(safe)}\n\n`;
     commentSseClients.forEach(res => {
       try { res.write(msg); } catch (e) { /* ignore write errors */ }
     });
@@ -889,9 +960,32 @@ app.get('/api/comments/stream', async (req, res) => {
 
   // add to client set
   commentSseClients.add(res);
+  // also expose this connection to generic event stream clients for compatibility
+  eventSseClients.add(res);
 
   req.on('close', () => {
     commentSseClients.delete(res);
+    eventSseClients.delete(res);
+  });
+});
+
+// GENERIC EVENTS SSE stream - broadcasts course/lesson/comment and other events
+// Clients may connect with optional query params ?courseId=...&lessonId=... and optional ?token=<jwt>
+app.get('/api/events/stream', async (req, res) => {
+  // Basic SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+
+  // send a welcome ping
+  res.write(`data: ${JSON.stringify({ welcome: 'events-stream', courseId: req.query.courseId || null, lessonId: req.query.lessonId || null })}\n\n`);
+
+  eventSseClients.add(res);
+
+  req.on('close', () => {
+    eventSseClients.delete(res);
   });
 });
 
@@ -1157,10 +1251,36 @@ app.get('/api/courses/:courseId/lessons/:lessonId/comments', async (req, res) =>
     const snap = await db.ref(`courses/${courseId}/lessons/${lessonId}/comments`).get();
     const data = snapshotVal(snap) || {};
     // Build nested replies structure
+    // Also fetch users so we can show a nicer display name (first name) when available
+    const usersSnap = await db.ref('users').get();
+    const users = snapshotVal(usersSnap) || {};
     const nodes = {};
     Object.keys(data).forEach(k => {
       const item = data[k] || {};
-      nodes[k] = { id: k, text: item.text || '', author: item.author || 'Anonymous', role: item.role || 'student', parent: item.parent || null, created_at: item.created_at || null, replies: [] };
+      const created_ts = (item && item.created_ts) ? item.created_ts : (item && item.created_at ? Date.parse(item.created_at) : null);
+      let displayAuthor = item.author || 'Anonymous';
+      // If the author looks like an email, try to map to a user's first name
+      try {
+        if (displayAuthor && displayAuthor.includes('@')) {
+          const userKey = displayAuthor.replace(/\./g, '_');
+          const u = users[userKey];
+          if (u && u.full_name) {
+            const first = String(u.full_name).trim().split(/\s+/)[0];
+            if (first) displayAuthor = first;
+          }
+        }
+      } catch (e) { /* ignore mapping errors */ }
+
+      nodes[k] = {
+        id: k,
+        text: item.text || '',
+        author: displayAuthor,
+        role: item.role || 'student',
+        parent: item.parent || null,
+        created_at: item.created_at || null,
+        created_ts: created_ts,
+        replies: []
+      };
     });
     const roots = [];
     Object.keys(nodes).forEach(k => {
@@ -1190,7 +1310,6 @@ app.post('/api/courses/:courseId/lessons/:lessonId/comments', async (req, res) =
     const lessonId = req.params.lessonId;
     const { text, parentId } = req.body;
     if (!text || String(text).trim() === '') return res.status(400).json({ message: 'Comment text is required.' });
-
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
     let author = 'Anonymous';
@@ -1211,13 +1330,38 @@ app.post('/api/courses/:courseId/lessons/:lessonId/comments', async (req, res) =
       author,
       role,
       parent: parentId || null,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      created_ts: Date.now()
     };
 
+    // If no valid JWT/authenticated user, generate an anonymous deletion token so the poster can delete their own comment later.
+    // Clients should store the returned `deletion_token` locally (e.g. localStorage) and include it when deleting.
+    let deletion_token = null;
+    if (!token || author === 'Anonymous') {
+      try {
+        deletion_token = crypto.randomBytes(12).toString('hex');
+        comment.deletion_token = deletion_token;
+      } catch (e) {
+        // fallback simple token
+        deletion_token = `t_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+        comment.deletion_token = deletion_token;
+      }
+    }
+
     await db.ref(`courses/${courseId}/lessons/${lessonId}/comments/${id}`).set(comment);
-    // Broadcast comment creation to SSE clients
-    try { broadcastCommentUpdate({ type: 'comment', action: 'created', courseId, lessonId, commentId: id, comment }); } catch (e) { /* ignore */ }
-    res.status(201).json({ id, ...comment });
+
+    // Broadcast a sanitized comment creation (do not include deletion_token in SSE)
+    try {
+      const sanitized = { type: 'comment', action: 'created', courseId, lessonId, commentId: id, comment: { ...comment } };
+      if (sanitized.comment) delete sanitized.comment.deletion_token;
+      await broadcastCommentUpdate(sanitized);
+      await broadcastEvent(sanitized);
+    } catch (e) { /* ignore */ }
+
+    const responsePayload = { id, ...comment };
+    // Only return deletion token to the creating client when it was generated
+    if (deletion_token) responsePayload.deletion_token = deletion_token;
+    res.status(201).json(responsePayload);
   } catch (e) {
     console.error('Create comment error:', e);
     res.status(500).json({ message: 'Server error creating comment.' });
@@ -1257,23 +1401,38 @@ app.get('/api/admin/comments', async (req, res) => {
   }
 });
 
-// Admin: delete comment
+// Admin/owner/anonymous-token: delete comment
 app.delete('/api/courses/:courseId/lessons/:lessonId/comments/:commentId', async (req, res) => {
   try {
-    const authHeader = req.headers.authorization || req.headers.Authorization;
-    if (!authHeader) return res.status(401).json({ message: 'Authorization header required.' });
-    const token = authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({ message: 'Bearer token required.' });
-    let payload;
-    try { payload = jwt.verify(token, JWT_SECRET); } catch (e) { return res.status(401).json({ message: 'Invalid or expired token.' }); }
-    if (payload.role !== 'admin') return res.status(403).json({ message: 'Admin access required.' });
+    // Accept deletion via: admin JWT, owner JWT, or anonymous deletion token (body/query/header)
+    const authHeader = req.headers.authorization || req.headers.Authorization || '';
+    const bearerToken = authHeader ? (authHeader.split(' ')[1]) : null;
+    let payload = null;
+    if (bearerToken) {
+      try { payload = jwt.verify(bearerToken, JWT_SECRET); } catch (e) { payload = null; }
+    }
 
     const { courseId, lessonId, commentId } = req.params;
     if (!courseId || !lessonId || !commentId) return res.status(400).json({ message: 'Missing identifiers.' });
 
+    // Fetch existing comment to check ownership / token
+    const commentSnap = await db.ref(`courses/${courseId}/lessons/${lessonId}/comments/${commentId}`).get();
+    const existing = snapshotVal(commentSnap);
+    if (!existing) return res.status(404).json({ message: 'Comment not found.' });
+
+    const isAdmin = payload && payload.role === 'admin';
+    const isOwner = payload && payload.email && existing.author && payload.email === existing.author;
+
+    // Check for deletion token provided by creator (allow in body, query, or x-deletion-token header)
+    const providedDeletionToken = (req.body && req.body.deletion_token) || req.query.deletion_token || req.headers['x-deletion-token'];
+    const tokenMatches = providedDeletionToken && existing.deletion_token && String(providedDeletionToken) === String(existing.deletion_token);
+
+    if (!isAdmin && !isOwner && !tokenMatches) return res.status(403).json({ message: 'Admin access, comment owner, or valid deletion token required.' });
+
     await db.ref(`courses/${courseId}/lessons/${lessonId}/comments/${commentId}`).set(null);
-    // Broadcast deletion
-    try { broadcastCommentUpdate({ type: 'comment', action: 'deleted', courseId, lessonId, commentId }); } catch (e) { /* ignore */ }
+    // Broadcast sanitized deletion event
+    try { await broadcastCommentUpdate({ type: 'comment', action: 'deleted', courseId, lessonId, commentId }); } catch (e) { /* ignore */ }
+    try { await broadcastEvent({ type: 'comment', action: 'deleted', courseId, lessonId, commentId }); } catch (e) { /* ignore */ }
     res.json({ message: 'Comment deleted.' });
   } catch (e) {
     console.error('Delete comment error:', e);
@@ -1296,6 +1455,19 @@ app.post('/api/courses/:id/lessons', async (req, res) => {
     if (!title) return res.status(400).json({ message: 'Lesson title required.' });
 
     const lessonId = `l_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    // Normalize image_url so stored value is browser-friendly:
+    let normalized_image_url = image_url || '';
+    if (normalized_image_url) {
+      try {
+        const u = new URL(normalized_image_url, `${req.protocol}://${req.get('host')}`);
+        // If the image host matches the request host, prefer storing a relative path
+        if (u.hostname === req.get('host')) normalized_image_url = u.pathname + (u.search || '') + (u.hash || '');
+      } catch (e) {
+        // Not an absolute URL. If it's a bare filename, prefix the uploads path
+        if (!normalized_image_url.includes('/')) normalized_image_url = `/Tii/uploads/lessons/${normalized_image_url}`;
+      }
+    }
+
     const lesson = {
       title,
       content: content || '',
@@ -1304,7 +1476,7 @@ app.post('/api/courses/:id/lessons', async (req, res) => {
       topic: topic || '',
       date: date || '',
       other_info: other_info || '',
-      image_url: image_url || '',
+      image_url: normalized_image_url || '',
       order: (typeof req.body.order === 'number') ? req.body.order : (req.body.order ? Number(req.body.order) : 0),
       published: req.body.published === true || req.body.published === 'true' ? true : false,
       created_at: new Date().toISOString(),
@@ -1312,6 +1484,16 @@ app.post('/api/courses/:id/lessons', async (req, res) => {
     };
 
     await db.ref(`courses/${courseId}/lessons/${lessonId}`).set(lesson);
+    // regenerate public course page so generated HTML stays in sync
+    try {
+      const courseSnap = await db.ref(`courses/${courseId}`).get();
+      const courseObj = snapshotVal(courseSnap) || {};
+      await generateCoursePage(courseId, courseObj);
+    } catch (e) { /* ignore generation errors */ }
+
+    // broadcast lesson creation event
+    try { broadcastEvent({ type: 'lesson', action: 'created', courseId, lessonId, lesson }); } catch (e) { /* ignore */ }
+
     res.status(201).json({ id: lessonId, ...lesson });
   } catch (e) {
     console.error('Create lesson error:', e);
@@ -1334,11 +1516,34 @@ app.delete('/api/courses/:id/lessons/:lessonId', async (req, res) => {
     if (!lessonId) return res.status(400).json({ message: 'Lesson id required.' });
 
     await db.ref(`courses/${courseId}/lessons/${lessonId}`).set(null);
+    // regenerate course page and broadcast deletion
+    try {
+      const courseSnap = await db.ref(`courses/${courseId}`).get();
+      const courseObj = snapshotVal(courseSnap) || {};
+      await generateCoursePage(courseId, courseObj);
+    } catch (e) { /* ignore */ }
+    try { broadcastEvent({ type: 'lesson', action: 'deleted', courseId, lessonId }); } catch (e) {}
     res.json({ message: 'Lesson deleted.' });
   } catch (e) {
     console.error('Delete lesson error:', e);
     res.status(500).json({ message: 'Server error deleting lesson.' });
   }
+});
+
+// regenerate page and broadcast when a lesson is deleted (hook into debug/admin delete flows)
+app.post('/_internal/hooks/lesson-deleted', async (req, res) => {
+  // This internal hook can be called with { courseId, lessonId }
+  try {
+    const { courseId, lessonId } = req.body || {};
+    if (!courseId) return res.status(400).json({ message: 'courseId required' });
+    try {
+      const courseSnap = await db.ref(`courses/${courseId}`).get();
+      const courseObj = snapshotVal(courseSnap) || {};
+      await generateCoursePage(courseId, courseObj);
+    } catch (e) {}
+    try { broadcastEvent({ type: 'lesson', action: 'deleted', courseId, lessonId }); } catch (e) {}
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ message: 'error' }); }
 });
 
 // PUT /api/courses/:id/lessons/:lessonId (admin only) - edit lesson
@@ -1364,12 +1569,30 @@ app.put('/api/courses/:id/lessons/:lessonId', async (req, res) => {
     if (topic !== undefined) updates.topic = topic;
     if (date !== undefined) updates.date = date;
     if (other_info !== undefined) updates.other_info = other_info;
-    if (image_url !== undefined) updates.image_url = image_url;
+    if (image_url !== undefined) {
+      let normalized_image_url = image_url || '';
+      if (normalized_image_url) {
+        try {
+          const u = new URL(normalized_image_url, `${req.protocol}://${req.get('host')}`);
+          if (u.hostname === req.get('host')) normalized_image_url = u.pathname + (u.search || '') + (u.hash || '');
+        } catch (e) {
+          if (!normalized_image_url.includes('/')) normalized_image_url = `/Tii/uploads/lessons/${normalized_image_url}`;
+        }
+      }
+      updates.image_url = normalized_image_url || '';
+    }
     if (order !== undefined) updates.order = (typeof order === 'number') ? order : (order ? Number(order) : 0);
     if (published !== undefined) updates.published = published === true || published === 'true' ? true : false;
     if (Object.keys(updates).length === 0) return res.status(400).json({ message: 'No updates provided.' });
 
     await db.ref(`courses/${courseId}/lessons/${lessonId}`).update({ ...updates, updated_at: new Date().toISOString(), updated_by: decoded.email || 'admin' });
+    // regenerate course page and broadcast update
+    try {
+      const courseSnap = await db.ref(`courses/${courseId}`).get();
+      const courseObj = snapshotVal(courseSnap) || {};
+      await generateCoursePage(courseId, courseObj);
+    } catch (e) { /* ignore */ }
+    try { broadcastEvent({ type: 'lesson', action: 'updated', courseId, lessonId, updates }); } catch (e) {}
     res.json({ message: 'Lesson updated.' });
   } catch (e) {
     console.error('Edit lesson error:', e);
@@ -1390,8 +1613,13 @@ if (hasMulter) {
 
       if (!req.file) return res.status(400).json({ message: 'No file uploaded.' });
       const filename = req.file.filename;
-      const url = `/Tii/uploads/lessons/${filename}`;
-      res.json({ url });
+      const relUrl = `/Tii/uploads/lessons/${filename}`;
+      const absUrl = `${req.protocol}://${req.get('host')}${relUrl}`;
+      const filePath = path.join(LESSON_UPLOAD_DIR, filename);
+      const exists = fs.existsSync(filePath);
+      console.log(`[UPLOAD] lesson image saved: ${filePath} exists=${exists}`);
+      // Return both relative and absolute forms to help clients choose the correct one
+      res.json({ url: relUrl, absolute_url: absUrl, filename, exists });
     } catch (e) {
       console.error('Upload lesson image error:', e);
       res.status(500).json({ message: 'Server error uploading image.' });
@@ -1427,8 +1655,12 @@ if (hasMulter) {
       const safeName = Date.now() + '_' + Math.random().toString(36).slice(2,8) + (ext || '.png');
       const outPath = path.join(LESSON_UPLOAD_DIR, safeName);
       await fs.promises.writeFile(outPath, buffer);
-      const url = `/Tii/uploads/lessons/${safeName}`;
-      res.json({ url });
+      const relUrl = `/Tii/uploads/lessons/${safeName}`;
+      const absUrl = `${req.protocol}://${req.get('host')}${relUrl}`;
+      const outPath2 = outPath;
+      const exists2 = fs.existsSync(outPath2);
+      console.log(`[UPLOAD base64] lesson image saved: ${outPath2} exists=${exists2}`);
+      res.json({ url: relUrl, absolute_url: absUrl, filename: safeName, exists: exists2 });
     } catch (e) {
       console.error('Base64 upload error:', e);
       res.status(500).json({ message: 'Server error saving base64 image.' });
@@ -1477,6 +1709,8 @@ app.post('/api/courses', async (req, res) => {
         await db.ref(`courses/${id}`).update({ url: targetUrl });
       }
       await generateCoursePage(id, course);
+      // broadcast course created
+      try { broadcastEvent({ type: 'course', action: 'created', courseId: id, course }); } catch (e) {}
     } catch (e) {
       console.warn('Failed to generate course page:', e && e.message ? e.message : e);
     }
@@ -1512,6 +1746,20 @@ app.post('/api/uploads/lessons/debug', async (req, res) => {
     console.error('Debug base64 upload error:', e);
     res.status(500).json({ message: 'Server error saving debug image.' });
   }
+});
+
+// Public helper: check whether an uploaded lesson file exists and return its public URL
+app.get('/api/uploads/lessons/check/:filename', (req, res) => {
+  try {
+    const filename = req.params.filename;
+    if (!filename) return res.status(400).json({ message: 'filename required' });
+    const safe = path.basename(filename);
+    const filePath = path.join(LESSON_UPLOAD_DIR, safe);
+    const exists = fs.existsSync(filePath);
+    const relUrl = `/Tii/uploads/lessons/${safe}`;
+    const absUrl = `${req.protocol}://${req.get('host')}${relUrl}`;
+    return res.json({ filename: safe, exists, url: relUrl, absolute_url: absUrl });
+  } catch (e) { console.error('Check upload error', e); return res.status(500).json({ message: 'Server error' }); }
 });
 
 // DEBUG: unauthenticated endpoint to create a lesson for testing (local only)
@@ -1589,6 +1837,9 @@ app.delete('/api/courses/:id', async (req, res) => {
 
     // Remove course data from DB
     await db.ref(`courses/${id}`).set(null);
+
+    // Broadcast course deletion
+    try { broadcastEvent({ type: 'course', action: 'deleted', courseId: id }); } catch (e) {}
 
     // Attempt to remove any locally generated HTML page for this course
     try {
@@ -1719,7 +1970,8 @@ async function generateCoursePage(id, course) {
       });
 
       const COURSE_ID = '${id}';
-      const apiBase = (typeof window !== 'undefined' && window.location && window.location.origin) ? window.location.origin : 'http://localhost:3000';
+      // Use relative API paths so pages work regardless of host/origin and avoid DNS/hostname resolution errors
+      const apiBase = '';
 
       // Helper to escape strings for insertion into DOM
       function escapeHtml(str){ if (str === null || str === undefined) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -1737,17 +1989,31 @@ async function generateCoursePage(id, course) {
         } catch(e){ console.error(e); listEl.innerHTML = '<p>Error loading comments.</p>'; }
       }
 
+      function parseJwt(token){
+        try{
+          if(!token) return null;
+          const p = token.split('.')[1];
+          if(!p) return null;
+          const b = p.replace(/-/g,'+').replace(/_/g,'/');
+          const json = decodeURIComponent(atob(b).split('').map(function(c){ return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join(''));
+          return JSON.parse(json);
+        }catch(e){ return null; }
+      }
+
       function renderComments(container, comments){
         container.innerHTML = '';
         if (!comments || !comments.length) { container.innerHTML = '<p>No comments yet.</p>'; return; }
         comments.forEach(c => {
           const node = document.createElement('div');
           node.className = 'comment';
-          node.innerHTML = '<div class="comment-meta"><strong>' + escapeHtml(c.author) + '</strong> <span class="comment-role">' + escapeHtml(c.role) + '</span> <span class="comment-time">' + escapeHtml(c.created_at || '') + '</span></div>' +
-                           '<div class="comment-text">' + escapeHtml(c.text) + '</div>';
-          // replies
+          const metaHtml = '<div class="comment-meta"><strong>' + escapeHtml(c.author) + '</strong> <span class="comment-role">' + escapeHtml(c.role) + '</span> <span class="comment-time">' + escapeHtml(c.created_at || '') + '</span></div>';
+          const textHtml = '<div class="comment-text">' + escapeHtml(c.text) + '</div>';
+          node.innerHTML = metaHtml + textHtml;
+
+          // replies container
+          let repliesWrap = null;
           if (c.replies && c.replies.length) {
-            const repliesWrap = document.createElement('div'); repliesWrap.className = 'comment-replies';
+            repliesWrap = document.createElement('div'); repliesWrap.className = 'comment-replies';
             c.replies.forEach(r => {
               const rn = document.createElement('div'); rn.className = 'comment reply';
               rn.innerHTML = '<div class="comment-meta"><strong>' + escapeHtml(r.author) + '</strong> <span class="comment-role">' + escapeHtml(r.role) + '</span> <span class="comment-time">' + escapeHtml(r.created_at || '') + '</span></div>' + '<div class="comment-text">' + escapeHtml(r.text) + '</div>';
@@ -1755,7 +2021,8 @@ async function generateCoursePage(id, course) {
             });
             node.appendChild(repliesWrap);
           }
-          // reply button
+
+          // reply button (toggles a reply form)
           const replyBtn = document.createElement('button'); replyBtn.className = 'mini-cta'; replyBtn.textContent = 'Reply';
           replyBtn.style.marginTop = '8px';
           replyBtn.addEventListener('click', ()=>{
@@ -1767,18 +2034,68 @@ async function generateCoursePage(id, course) {
               ev.preventDefault();
               const ta = form.querySelector('textarea');
               const text = ta.value.trim(); if (!text) return;
-              const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+              const tokenLocal = localStorage.getItem('token') || localStorage.getItem('authToken');
               try{
                 const hdrs = { 'Content-Type': 'application/json' };
-                if (token) hdrs['Authorization'] = 'Bearer ' + token;
-                const resp = await fetch(apiBase + '/api/courses/' + COURSE_ID + '/lessons/' + (container.closest('.comments-section') ? container.closest('.comments-section').dataset.lessonId : '') + '/comments', { method: 'POST', headers: hdrs, body: JSON.stringify({ text: text, parentId: c.id }) });
-                if (resp.ok) { ta.value = ''; loadComments(container.dataset.lessonId || container.id.replace('comments_','')); }
-                else { alert('Failed to post reply'); }
+                if (tokenLocal) hdrs['Authorization'] = 'Bearer ' + tokenLocal;
+                const lessonId = container.closest('.comments-section') ? container.closest('.comments-section').dataset.lessonId : '';
+                const resp = await fetch(apiBase + '/api/courses/' + COURSE_ID + '/lessons/' + lessonId + '/comments', { method: 'POST', headers: hdrs, body: JSON.stringify({ text: text, parentId: c.id }) });
+                const jb = await resp.json().catch(()=>null);
+                if (resp.ok) {
+                  // if server returned an anonymous deletion token, store it so the poster can delete later
+                  if (jb && jb.deletion_token && jb.id) localStorage.setItem('c_del_' + jb.id, jb.deletion_token);
+                  ta.value = '';
+                  loadComments(container.dataset.lessonId || container.id.replace('comments_',''));
+                } else { alert('Failed to post reply'); }
               }catch(err){ console.error(err); alert('Error posting reply'); }
             });
             node.appendChild(form);
           });
+
           node.appendChild(replyBtn);
+
+          // Add collapse/expand toggle for replies (if present)
+          if (repliesWrap) {
+            const toggle = document.createElement('button'); toggle.className = 'mini-cta manage-inline'; toggle.style.marginLeft = '8px'; toggle.textContent = 'Collapse Replies';
+            toggle.addEventListener('click', ()=>{
+              if (repliesWrap.style.display === 'none') { repliesWrap.style.display = 'block'; toggle.textContent = 'Collapse Replies'; }
+              else { repliesWrap.style.display = 'none'; toggle.textContent = 'Show Replies'; }
+            });
+            node.appendChild(toggle);
+          }
+
+          // Delete button (owner or anonymous with stored deletion token)
+          (function(){
+            const curToken = localStorage.getItem('token') || localStorage.getItem('authToken');
+            const curPayload = parseJwt(curToken);
+            const curEmail = curPayload && curPayload.email ? curPayload.email : null;
+            const anonKey = localStorage.getItem('c_del_' + c.id);
+            const canDelete = (curEmail && c.author && curEmail === c.author) || (!!anonKey);
+            if (canDelete) {
+              const delBtn = document.createElement('button'); delBtn.className = 'mini-cta'; delBtn.style.marginLeft = '8px'; delBtn.textContent = 'Delete';
+              delBtn.addEventListener('click', async ()=>{
+                if (!confirm('Delete this comment?')) return;
+                try{
+                  const hdrs = {};
+                  if (curToken) hdrs['Authorization'] = 'Bearer ' + curToken;
+                  else if (anonKey) hdrs['x-deletion-token'] = anonKey;
+                  const lessonId = container.closest('.comments-section') ? container.closest('.comments-section').dataset.lessonId : '';
+                  const resp = await fetch(apiBase + '/api/courses/' + COURSE_ID + '/lessons/' + lessonId + '/comments/' + c.id, { method: 'DELETE', headers: hdrs });
+                  if (resp.ok) {
+                    // remove stored anonymous token if used
+                    if (anonKey) localStorage.removeItem('c_del_' + c.id);
+                    loadComments(lessonId);
+                  } else {
+                    const jb = await resp.json().catch(()=>null);
+                    console.error('Delete failed', jb);
+                    alert('Failed to delete comment');
+                  }
+                } catch (e) { console.error(e); alert('Error deleting comment'); }
+              });
+              node.appendChild(delBtn);
+            }
+          })();
+
           container.appendChild(node);
         });
       }
@@ -1793,12 +2110,18 @@ async function generateCoursePage(id, course) {
             ev.preventDefault();
             const ta = form.querySelector('textarea[name="text"]');
             const text = ta && ta.value.trim(); if (!text) return;
-            const token = localStorage.getItem('token') || localStorage.getItem('authToken');
+            const tokenLocal = localStorage.getItem('token') || localStorage.getItem('authToken');
             try{
               const hdrs = { 'Content-Type': 'application/json' };
-              if (token) hdrs['Authorization'] = 'Bearer ' + token;
+              if (tokenLocal) hdrs['Authorization'] = 'Bearer ' + tokenLocal;
               const resp = await fetch(apiBase + '/api/courses/' + COURSE_ID + '/lessons/' + lessonId + '/comments', { method: 'POST', headers: hdrs, body: JSON.stringify({ text }) });
-              if (resp.ok){ ta.value = ''; loadComments(lessonId); }
+              const jb = await resp.json().catch(()=>null);
+              if (resp.ok){
+                // store anonymous deletion token if provided
+                if (jb && jb.deletion_token && jb.id) localStorage.setItem('c_del_' + jb.id, jb.deletion_token);
+                ta.value = '';
+                loadComments(lessonId);
+              }
               else { alert('Failed to post comment'); }
             } catch(err){ console.error(err); alert('Error posting comment'); }
           });
@@ -1808,13 +2131,12 @@ async function generateCoursePage(id, course) {
       const token = localStorage.getItem('token') || localStorage.getItem('authToken');
       if(token){
         const actions = document.getElementById('course-actions');
-        if(actions) actions.innerHTML = '<a class="btn" href="/Tii/upload-lesson.html?course=' + COURSE_ID + '">Add Lesson</a>';
+        if(actions) actions.innerHTML = '';
       }
 
       // Set up EventSource to receive comment create/delete events and refresh affected lesson comments
       try {
-        const esUrlBase = apiBase + '/api/comments/stream?courseId=' + encodeURIComponent(COURSE_ID);
-        const esUrl = esUrlBase + (token ? ('&token=' + encodeURIComponent(token)) : '');
+        const esUrl = '/api/comments/stream?courseId=' + encodeURIComponent(COURSE_ID) + (token ? ('&token=' + encodeURIComponent(token)) : '');
         const es = new EventSource(esUrl);
         es.onmessage = function(ev){
           try {
