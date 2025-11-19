@@ -12,8 +12,13 @@
         <a href="admin-portal.html">← Back to Admin</a>
     </header>
     <main style="max-width:800px;margin:40px auto;">
-        <h2>Add New Course</h2>
-        <form id="upload-course-form">
+        <h2>Add New Course (Admin Only)</h2>
+
+        <div id="not-admin-message" style="color:#555;margin-bottom:16px">
+            Course creation is restricted. Please <a href="/Tii/admin-portal.html">open the Admin Portal</a> to manage courses.
+        </div>
+
+        <form id="upload-course-form" style="display:none;">
             <div class="form-group">
                 <label for="title">Course Title</label>
                 <input id="title" name="title" required />
@@ -22,7 +27,6 @@
                 <label for="description">Description</label>
                 <textarea id="description" name="description" rows="5" required></textarea>
             </div>
-            <!-- URL removed: server will generate a local course page automatically -->
             <div class="form-group">
                 <label for="placement">Display As</label>
                 <select id="placement" name="placement">
@@ -34,67 +38,50 @@
             <div id="upload-course-message" style="margin-top:12px;"></div>
         </form>
     </main>
-    <script type="module">
-    import { handleAuthButton } from './auth.js';
-    handleAuthButton();
+    <script>
+    (function(){
+        const API_URL = window.location.origin || 'http://localhost:3000';
 
-    const API_URL = window.location.origin || 'http://localhost:3000';
-
-    document.getElementById('upload-course-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const title = document.getElementById('title').value.trim();
-        const description = document.getElementById('description').value.trim();
-        // no url field — server will generate a local course page automatically
-        const msgEl = document.getElementById('upload-course-message');
-        msgEl.textContent = '';
+        function parseJwt(token){ try{ if(!token) return null; const p = token.split('.')[1]; if(!p) return null; const b = p.replace(/-/g,'+').replace(/_/g,'/'); const json = decodeURIComponent(atob(b).split('').map(function(c){ return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')); return JSON.parse(json); }catch(e){return null} }
 
         const token = localStorage.getItem('authToken');
-        if (!token) { msgEl.style.color = '#c0392b'; msgEl.textContent = 'You must be logged in as admin.'; return; }
+        const payload = parseJwt(token);
+        const isAdmin = payload && payload.role === 'admin';
 
-        console.log('Token:', token.substring(0, 20) + '...');
-
-        try {
-            const placement = document.getElementById('placement').value || 'other';
-            const resp = await fetch(`${API_URL}/api/courses`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ title, description, placement })
-            });
-            const result = await resp.json();
-            console.log('Response status:', resp.status, 'Body:', result);
-            if (resp.ok) {
-                msgEl.style.color = '#2a6e62';
-                msgEl.textContent = 'Course added successfully!';
-                document.getElementById('upload-course-form').reset();
-                // Show preview in admin page using curriculum style if selected
-                // Show link to course page and an Upload Lessons button
-                const container = document.getElementById('upload-course-message');
-                const link = document.createElement('a');
-                link.href = result.url || '#';
-                link.target = '_blank';
-                link.textContent = 'Open course page';
-                link.style.display = 'inline-block';
-                link.style.marginRight = '12px';
-                link.className = 'explore-btn-secondary';
-                container.appendChild(link);
-
-                const uploadBtn = document.createElement('a');
-                uploadBtn.href = `upload-lesson.html?course=${result.id}`;
-                uploadBtn.textContent = 'Upload lessons to this course';
-                uploadBtn.className = 'explore-btn-secondary';
-                uploadBtn.style.display = 'inline-block';
-                uploadBtn.style.marginLeft = '6px';
-                container.appendChild(uploadBtn);
-            } else {
-                msgEl.style.color = '#c0392b';
-                msgEl.textContent = `Error (${resp.status}): ${result.message || 'Failed to add course.'}`;
-            }
-        } catch (err) {
-            console.error('Network error:', err);
-            msgEl.style.color = '#c0392b';
-            msgEl.textContent = 'Network error: ' + err.message;
+        const form = document.getElementById('upload-course-form');
+        const msg = document.getElementById('not-admin-message');
+        if (isAdmin && form) {
+            form.style.display = '';
+            if (msg) msg.style.display = 'none';
+        } else {
+            if (form) form.style.display = 'none';
+            if (msg) msg.style.display = '';
+            return; // not admin — do not attach submit handlers
         }
-    });
+
+        document.getElementById('upload-course-form').addEventListener('submit', async (e)=>{
+            e.preventDefault();
+            const title = document.getElementById('title').value.trim();
+            const description = document.getElementById('description').value.trim();
+            const placement = document.getElementById('placement').value || 'other';
+            const out = document.getElementById('upload-course-message'); out.textContent='';
+            try{
+                const resp = await fetch(`${API_URL}/api/courses`,{
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+                    body: JSON.stringify({ title, description, placement })
+                });
+                const jb = await resp.json().catch(()=>null);
+                if (resp.ok) {
+                    out.style.color = '#2a6e62'; out.textContent = 'Course added successfully.';
+                    // show link to course
+                    const link = document.createElement('a'); link.href = jb.url || '#'; link.target = '_blank'; link.textContent = 'Open course page'; link.className='explore-btn-secondary'; link.style.display='inline-block'; link.style.marginTop='8px'; out.appendChild(link);
+                } else {
+                    out.style.color='#c0392b'; out.textContent = `Failed to add course: ${jb && jb.message ? jb.message : resp.status}`;
+                }
+            } catch(err){ console.error(err); out.style.color='#c0392b'; out.textContent = 'Network error: '+err.message; }
+        });
+    })();
     </script>
 </body>
 </html>
