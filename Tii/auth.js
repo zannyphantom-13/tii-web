@@ -34,7 +34,14 @@ export function setupPasswordToggles() {
 ============================================ */
 export function handleAuthButton() {
     const authButton = document.getElementById('auth-button');
-    if (!authButton) return;
+    // If header hasn't been parsed yet, retry on DOMContentLoaded so pages that import
+    // this module early still correctly initialize the auth button.
+    if (!authButton) {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => handleAuthButton(), { once: true });
+        }
+        return;
+    }
 
     // Remove any existing event listeners by replacing the node with a cloned node
     const fresh = authButton.cloneNode(true);
