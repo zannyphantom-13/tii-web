@@ -770,7 +770,11 @@
                     const resp = await fetch(`${API_URL}/api/courses`);
                     if (!resp.ok) return;
                     const data = await resp.json();
-                    const courses = Object.keys(data || {}).map(id => ({ id, ...(data[id] || {}) }));
+                    let courses = [];
+                    // Support multiple response shapes: { courses: [...] } or array or map
+                    if (Array.isArray(data)) courses = data;
+                    else if (data && Array.isArray(data.courses)) courses = data.courses;
+                    else if (data && typeof data === 'object') courses = Object.keys(data).map(id => ({ id, ...(data[id] || {}) }));
                     renderAdminCourses(courses);
                 } catch (err) {
                     console.error('Failed to fetch courses for admin view', err);

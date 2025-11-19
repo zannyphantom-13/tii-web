@@ -34,25 +34,11 @@
                 return;
             }
             data.courses.forEach(c => {
-                // Only show user-added courses (not built-in, test, or demo)
-                const isStatic = (
-                    (c.title && (
-                        c.title.toLowerCase().includes('informatics initiative') ||
-                        c.title.toLowerCase().includes('intro to applied informatics') ||
-                        c.title.toLowerCase().includes('computational chemistry') ||
-                        c.title.toLowerCase().includes('data analysis') ||
-                        c.title.toLowerCase().includes('drug discovery') ||
-                        c.title.toLowerCase().includes('bioinformatics') ||
-                        c.title.toLowerCase().includes('programming')
-                    )) ||
-                    (c.created_by && (
-                        c.created_by.toLowerCase().includes('test') ||
-                        c.created_by.toLowerCase().includes('debug') ||
-                        c.created_by.toLowerCase().includes('system')
-                    )) ||
-                    (c.placement && c.placement !== 'added')
-                );
-                if (isStatic) return;
+                // Show courses that appear to be user-added/generated.
+                // Consider a course 'added' when its id starts with 'c_' or when created_by is present and not 'static'.
+                const createdBy = (c.created_by || '').toString().toLowerCase();
+                const isAdded = (c.id && String(c.id).startsWith('c_')) || (createdBy && createdBy !== 'static');
+                if (!isAdded) return;
                 if (!c.title || c.title.trim() === '') return;
                 const div = document.createElement('div');
                 div.style.display = 'flex';
