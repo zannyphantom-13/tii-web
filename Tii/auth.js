@@ -43,7 +43,7 @@ export function handleAuthButton() {
         });
     } else if (authButton) {
         authButton.textContent = 'Login';
-        authButton.href = 'login.html';
+        authButton.href = '/Tii/login.html'; // Use absolute Tii path so links work consistently from any page
     }
 }
 
@@ -56,7 +56,7 @@ export function logout() {
     localStorage.removeItem('userRole');
     localStorage.removeItem('verificationEmail');
     alert('You have been logged out.');
-    window.location.href = 'index.html';
+    window.location.href = '/Tii/index.html'; // Redirect to the Tii index page explicitly
 }
 
 /* ============================================
@@ -151,16 +151,16 @@ export function handleRegistration() {
 
             if (response.ok) {
                 // Success: server should return an auth token; store it and redirect to portal
-                if (result && (result.authToken || result.token || result.auth_token)) {
+                    if (result && (result.authToken || result.token || result.auth_token)) {
                     const tokenVal = result.authToken || result.token || result.auth_token;
                     localStorage.setItem('authToken', tokenVal);
                     localStorage.setItem('userName', result.full_name || data.full_name || result.user?.fullName || 'Student');
                     localStorage.setItem('userRole', result.role || 'student');
                     // Redirect to student portal
-                    window.location.href = 'portal.html';
+                        window.location.href = '/Tii/portal.html';
                 } else {
                     // Fallback: if no token returned, redirect to portal (user is created)
-                    window.location.href = 'portal.html';
+                        window.location.href = '/Tii/portal.html';
                 }
             } else {
                 const msg = result.message || 'Registration failed.';
@@ -248,11 +248,11 @@ export function handleLogin() {
                 handleAuthButton();
 
                 // Redirect based on role
-                if (result.role === 'admin') {
-                    window.location.href = 'admin-portal.html';
-                } else {
-                    window.location.href = 'portal.html';
-                }
+                    if (result.role === 'admin') {
+                        window.location.href = '/Tii/admin-portal.html';
+                    } else {
+                        window.location.href = '/Tii/portal.html';
+                    }
             } else if (response.status === 403 && result.action === 'redirect_to_otp') {
                 // Previously redirected to OTP verification; OTP flow removed.
                 // Show server message and focus the email input to prompt the user.
@@ -377,7 +377,7 @@ async function handleAdminLoginStep1(event) {
             localStorage.setItem('authToken', result.authToken);
             localStorage.setItem('userName', result.full_name);
             localStorage.setItem('userRole', result.role);
-            window.location.href = 'admin-portal.html';
+                window.location.href = '/Tii/admin-portal.html'; // Redirect to admin portal with absolute path
         } else if (response.status === 403 && result.action === 'require_token') {
             // Case 2: Credentials correct, but token required (e.g., student trying to become admin)
             displayAdminError("Credentials accepted. A one-time admin token has been requested. Please check the Admin Email.");
@@ -466,11 +466,11 @@ export function updatePortalLink() {
     if (!portalLink) return;
 
     if (userRole === 'admin') {
-        portalLink.textContent = 'Admin Portal';
-        portalLink.href = 'admin-portal.html';
+           portalLink.textContent = 'Admin Portal';
+           portalLink.href = '/Tii/admin-portal.html';
     } else {
-        portalLink.textContent = 'Student Portal';
-        portalLink.href = 'portal.html';
+           portalLink.textContent = 'Student Portal';
+           portalLink.href = '/Tii/portal.html';
     }
 }
 
@@ -488,10 +488,10 @@ export function initializeAdminLogin() {
     // Ensure forms are correctly initialized (Step 1 visible, Step 2 hidden)
     if (step1Form && step2Form) {
         // We ensure Step 2 is hidden initially, in case of browser back button behavior
-        step1Form.classList.remove('hidden');
-        step2Form.classList.add('hidden');
+                    if (result.role === 'admin') {
+                        window.location.href = '/Tii/admin-portal.html'; // Redirect to admin portal with absolute path
     }
-    
+                        window.location.href = '/Tii/portal.html'; // Redirect to student portal with absolute path
     // Attach event listeners
     if (step1Form) {
         step1Form.addEventListener('submit', handleAdminLoginStep1);
