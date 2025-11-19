@@ -1493,7 +1493,7 @@ async function generateCoursePage(id, course) {
     const rl = document.getElementById('lessons');
     const actions = document.getElementById('course-actions');
     try{
-      const res = await fetch(`/api/courses/${id}/lessons`);
+      const res = await fetch('/api/courses/' + COURSE_ID + '/lessons');
       if(!res.ok) return rl.innerHTML = '<p>Failed to load lessons.</p>';
       const data = await res.json();
       const list = data.lessons || data;
@@ -1503,14 +1503,14 @@ async function generateCoursePage(id, course) {
         list.forEach(ls => {
           const card = document.createElement('div');
           card.className = 'lesson-card';
-          card.innerHTML = `<h3 class="lesson-title">${(ls.title||'').replace(/"/g,'\"')}</h3><div class="lesson-meta">${(ls.topic||'')}</div><div>${(ls.content||'')}</div>`;
+          card.innerHTML = '<h3 class="lesson-title">' + (ls.title || '') + '</h3><div class="lesson-meta">' + (ls.topic || '') + '</div><div>' + (ls.content || '') + '</div>';
           rl.appendChild(card);
         });
       }
     }catch(e){ rl.innerHTML = '<p>Error loading lessons.</p>'; console.error(e) }
 
     const token = localStorage.getItem('authToken');
-    if(token && actions) actions.innerHTML = `<a class="btn" href="/Tii/upload-lesson.html?course=${COURSE_ID}">Add Lesson</a>`;
+    if(token && actions) actions.innerHTML = '<a class="btn" href="/Tii/upload-lesson.html?course=' + COURSE_ID + '">Add Lesson</a>';
   })();
   </script>
 
