@@ -1748,7 +1748,19 @@ main {
     .comments-section .comment, .comment.reply { font-size: 0.95em; padding: 10px; }
     .comments-section textarea, .comments-section input, .form-group textarea { width: 100%; box-sizing: border-box; }
     .comment-meta { font-size: 0.8em; }
-    .main-nav { display: none; } /* hide desktop nav on very small screens (mobile nav handled elsewhere) */
+    /* Ensure main navigation remains visible on very small screens.
+       Some pages don't include a separate mobile nav implementation,
+       so keep the stacked column nav here so headers aren't missing. */
+    .main-nav {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        text-align: center;
+        margin-top: 8px;
+        border-top: 1px solid #eee;
+        background: transparent;
+        z-index: 30;
+    }
     header { padding: 12px 10px; }
     .logo-container h1 { font-size: 14px; }
 }

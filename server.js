@@ -1282,6 +1282,13 @@ app.get('/api/courses/:courseId/lessons/:lessonId/comments', async (req, res) =>
         replies: []
       };
     });
+    // Add reply_to_name for replies so UI can show who is being replied to
+    Object.keys(nodes).forEach(nk => {
+      const node = nodes[nk];
+      if (node.parent && nodes[node.parent]) {
+        node.reply_to_name = nodes[node.parent].author || null;
+      }
+    });
     const roots = [];
     Object.keys(nodes).forEach(k => {
       const n = nodes[k];
@@ -1423,8 +1430,8 @@ app.delete('/api/courses/:courseId/lessons/:lessonId/comments/:commentId', async
     const isAdmin = payload && payload.role === 'admin';
     const isOwner = payload && payload.email && existing.author && payload.email === existing.author;
 
-    // Check for deletion token provided by creator (allow in body, query, or x-deletion-token header)
-    const providedDeletionToken = (req.body && req.body.deletion_token) || req.query.deletion_token || req.headers['x-deletion-token'];
+    // Check for deletion token provided by creator. Accept multiple header/query/body names for compatibility
+    const providedDeletionToken = (req.body && req.body.deletion_token) || req.query.deletion_token || req.headers['x-deletion-token'] || req.headers['x-deletion'] || req.headers['deletion-token'];
     const tokenMatches = providedDeletionToken && existing.deletion_token && String(providedDeletionToken) === String(existing.deletion_token);
 
     if (!isAdmin && !isOwner && !tokenMatches) return res.status(403).json({ message: 'Admin access, comment owner, or valid deletion token required.' });
