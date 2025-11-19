@@ -132,7 +132,7 @@
           const d = document.createElement('div');
           d.style.padding = '6px 0';
           // prefer course page under courses/ if present (builtins use this pattern)
-          const href = c.url && c.url.length ? c.url : `courses/${c.id}.html`;
+          const href = c.url && c.url.length ? c.url : `/Tii/courses/${encodeURIComponent(c.id)}.html`;
           d.innerHTML = `<a href="${href}" target="_blank">${c.title}</a> <div style="font-size:12px;color:#666">${c.placement||'other'}</div>`;
           existing.appendChild(d);
         });
