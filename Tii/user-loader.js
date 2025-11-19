@@ -5,8 +5,9 @@ const authToken = localStorage.getItem("authToken");
 const userRole = localStorage.getItem("userRole"); 
 const isLoggedIn = !!authToken;
 
-// Determine the current page for checks
-const currentPage = window.location.pathname.split("/").pop() || "index.html"; 
+// Determine the current page for checks (normalize: strip query/search)
+const currentPage = (window.location.pathname || '').split('/').pop() || 'index.html';
+const currentPageNorm = currentPage.split('?')[0]; // defensive: ensure no query string
 
 // Debug: log auth state and current page (no secrets)
 try {
@@ -48,7 +49,7 @@ const adminPages = ["admin.html", "admin-portal.html", "manage-users.html"];
  * 1. POST-LOGIN REDIRECTION (Block login pages if logged in)
  * If the user is logged in and tries to access a login-related page, send them to the main portal (index.html).
  */
-if (isLoggedIn && loginPages.includes(currentPage)) {
+if (!window.__tii_suppress_redirects && isLoggedIn && loginPages.includes(currentPageNorm)) {
     // Redirect logged-in users away from login pages to their portal (admin -> admin portal)
     const role = localStorage.getItem('userRole');
     if (role === 'admin') window.location.href = '/Tii/admin-portal.html';
@@ -59,14 +60,19 @@ if (isLoggedIn && loginPages.includes(currentPage)) {
  * 2. GENERAL PAGE PROTECTION (Block unauthenticated users)
  * If NOT logged in, redirect them to login.html if they try to access any protected page.
  */
-if (!isLoggedIn) {
+if (!window.__tii_suppress_redirects && !isLoggedIn) {
     // Combine all pages that require login (Student + Admin)
     const allProtectedPages = [...studentProtectedPages, ...adminPages];
 
     // Only redirect if the current page is protected AND is NOT a login page
-    if (allProtectedPages.includes(currentPage) && !loginPages.includes(currentPage)) {
-        // Redirect unauthenticated users to the Tii login page explicitly
-        window.location.href = "/Tii/login.html";
+    if (allProtectedPages.includes(currentPageNorm) && !loginPages.includes(currentPageNorm)) {
+        // If already on login page (with a next param) don't redirect again — avoid loop.
+        const alreadyOnLogin = /login\.html(\?|$)/.test(window.location.pathname + window.location.search);
+        if (!alreadyOnLogin) {
+            // Preserve the intended next path so login can redirect back after success
+            const next = window.location.pathname + window.location.search;
+            window.location.href = `/Tii/login.html?next=${encodeURIComponent(next)}`;
+        }
     }
 }
 
@@ -74,7 +80,7 @@ if (!isLoggedIn) {
  * 3. ROLE-BASED ACCESS CONTROL (Admin-only pages)
  * If the page is an admin page AND the user is not an admin, redirect them.
  */
-if (adminPages.includes(currentPage) && userRole !== "admin") {
+if (!window.__tii_suppress_redirects && adminPages.includes(currentPageNorm) && userRole !== "admin") {
     // Redirect non-admins trying to access admin pages to a safe student area (absolute path)
     window.location.href = "/Tii/portal.html";
 }
