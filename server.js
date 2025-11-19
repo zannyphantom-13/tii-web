@@ -1449,6 +1449,9 @@ async function generateCoursePage(id, course) {
     const safeTitle = (course && course.title) ? String(course.title).replace(/</g,'&lt;').replace(/>/g,'&gt;') : 'Untitled';
     const safeDesc = (course && course.description) ? String(course.description).replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
     const placementLabel = (course && course.placement === 'curriculum') ? 'Curriculum' : ((course && course.placement) ? String(course.placement) : 'Other');
+    // detect uploaded/generated courses (not static)
+    const isUploaded = (course && course.created_by && String(course.created_by).toLowerCase() !== 'static') || (id && String(id).startsWith('c_'));
+    const accent = isUploaded ? '#d32f2f' : '#2a6e62';
 
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -1473,8 +1476,8 @@ async function generateCoursePage(id, course) {
 
   <main>
     <div class="course-hero">
-      <h1>${safeTitle}</h1>
-      <div class="course-meta">${placementLabel} • ${course.created_by ? `Added by ${course.created_by}` : 'Public'}</div>
+      <h1 style="color: ${accent};">${safeTitle}</h1>
+      <div class="course-meta" style="color: ${accent};">${placementLabel} • ${course.created_by ? `Added by ${course.created_by}` : 'Public'}</div>
       <div class="course-body" id="course-description">${safeDesc}</div>
       <div id="course-actions" style="margin-top:12px;"></div>
       <div id="lessons" class="lesson-list">Loading lessons...</div>

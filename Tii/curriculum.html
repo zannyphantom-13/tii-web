@@ -143,7 +143,8 @@
 
                     // Admin-only actions for uploaded courses: visible when auth token exists
                     const token = localStorage.getItem('authToken');
-                    if (token && c.id){
+                    // Only show admin actions on static courses (not uploaded ones)
+                    if (token && c.id && !isUploaded){
                         const addLink = document.createElement('a');
                         addLink.href = '/Tii/upload-lesson.html?course=' + encodeURIComponent(c.id);
                         addLink.className = 'mini-cta';

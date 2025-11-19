@@ -481,6 +481,9 @@ main {
     border-radius: 6px;
     margin-bottom: 12px;
 }
+/* Hide empty or invalid image placeholders (avoid browser broken-image icon or black boxes) */
+.other-course-card img[src=""], .other-course-card img[src="null"], .other-course-card img[src="undefined"] { display: none; }
+.other-course-card img { background: transparent; }
 /* Make CTA inside card stand out and not full-width like global style */
 .other-course-card .explore-btn-secondary {
     display: inline-block;
