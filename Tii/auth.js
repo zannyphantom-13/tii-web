@@ -56,7 +56,8 @@ export function logout() {
     localStorage.removeItem('userRole');
     localStorage.removeItem('verificationEmail');
     alert('You have been logged out.');
-    window.location.href = '/Tii/index.html'; // Redirect to the Tii index page explicitly
+    // Redirect to the login page so the portal remains reachable when signed in next time
+    window.location.href = '/Tii/login.html';
 }
 
 /* ============================================
