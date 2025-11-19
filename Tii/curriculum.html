@@ -158,14 +158,9 @@
                             manageBtn.href = '/Tii/admin-portal.html?edit_course=' + encodeURIComponent(c.id);
                             actionsWrap.appendChild(manageBtn);
                         }
+                        // For uploaded/generated courses we do NOT add a second Manage button here.
+                        // The primary 'Open' button above is used to navigate to the course HTML.
                     }
-
-                    // append action wrapper
-                    a.appendChild(actionsWrap);
-
-                    return a;
-                }
-
                 // Filter courses and render them; exclude admin/system placeholder titles
                 data.courses
                     .filter(c => c.placement === 'curriculum' && c.title && c.title.trim() !== '' )
