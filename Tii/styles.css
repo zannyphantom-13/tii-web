@@ -484,6 +484,23 @@ main {
 /* Hide empty or invalid image placeholders (avoid browser broken-image icon or black boxes) */
 .other-course-card img[src=""], .other-course-card img[src="null"], .other-course-card img[src="undefined"] { display: none; }
 .other-course-card img { background: transparent; }
+
+/* Uploaded-course specific button / text color overrides */
+.other-course-card.uploaded .mini-cta {
+    border-color: #d32f2f;
+    color: #d32f2f;
+}
+.other-course-card.uploaded .mini-cta:hover { background: #fff4f4; }
+.other-course-card.uploaded .mini-cta.manage-inline {
+    /* make the manage button stand out on uploaded cards too */
+    border-color: #d32f2f;
+    color: #d32f2f;
+}
+.other-course-card.uploaded .explore-btn-secondary {
+    background: linear-gradient(90deg,#d32f2f,#b71c1c);
+}
+.other-course-card.uploaded .explore-btn-secondary:hover { background: #b71c1c; }
+.other-course-card.uploaded h4 { color: #b71c1c; }
 /* Make CTA inside card stand out and not full-width like global style */
 .other-course-card .explore-btn-secondary {
     display: inline-block;

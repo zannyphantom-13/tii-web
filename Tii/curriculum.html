@@ -143,20 +143,28 @@
 
                     // Admin-only actions for uploaded courses: visible when auth token exists
                     const token = localStorage.getItem('authToken');
-                    // Only show admin actions on static courses (not uploaded ones)
-                    if (token && c.id && !isUploaded){
-                        const addLink = document.createElement('a');
-                        addLink.href = '/Tii/upload-lesson.html?course=' + encodeURIComponent(c.id);
-                        addLink.className = 'mini-cta';
-                        addLink.textContent = 'Add Lesson';
-                        actionsWrap.appendChild(addLink);
+                    if (token && c.id) {
+                        if (!isUploaded) {
+                            // static course: show both Add Lesson and Manage
+                            const addLink = document.createElement('a');
+                            addLink.href = '/Tii/upload-lesson.html?course=' + encodeURIComponent(c.id);
+                            addLink.className = 'mini-cta';
+                            addLink.textContent = 'Add Lesson';
+                            actionsWrap.appendChild(addLink);
 
-                        // Manage button (inline within actions for consistent layout)
-                        const manageBtn = document.createElement('a');
-                        manageBtn.className = 'mini-cta manage-inline';
-                        manageBtn.textContent = 'Manage';
-                        manageBtn.href = '/Tii/admin-portal.html?edit_course=' + encodeURIComponent(c.id);
-                        actionsWrap.appendChild(manageBtn);
+                            const manageBtn = document.createElement('a');
+                            manageBtn.className = 'mini-cta manage-inline';
+                            manageBtn.textContent = 'Manage';
+                            manageBtn.href = '/Tii/admin-portal.html?edit_course=' + encodeURIComponent(c.id);
+                            actionsWrap.appendChild(manageBtn);
+                        } else {
+                            // uploaded/generated course: show single Manage button only
+                            const manageOnly = document.createElement('a');
+                            manageOnly.className = 'mini-cta manage-inline';
+                            manageOnly.textContent = 'Manage';
+                            manageOnly.href = '/Tii/admin-portal.html?edit_course=' + encodeURIComponent(c.id);
+                            actionsWrap.appendChild(manageOnly);
+                        }
                     }
 
                     // append action wrapper
