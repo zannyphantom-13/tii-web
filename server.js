@@ -775,6 +775,20 @@ app.post('/api/admin-tokens/revoke', async (req, res) => {
 // ============================================
 const sseClients = new Set();
 
+// Comment SSE clients (for real-time comment notifications)
+const commentSseClients = new Set();
+
+async function broadcastCommentUpdate(payload) {
+  try {
+    const msg = `data: ${JSON.stringify(payload)}\n\n`;
+    commentSseClients.forEach(res => {
+      try { res.write(msg); } catch (e) { /* ignore write errors */ }
+    });
+  } catch (e) {
+    console.warn('Failed to broadcast comment update', e && e.message ? e.message : e);
+  }
+}
+
 async function getPendingTokensSnapshot() {
   const snapshot = await db.ref('users').get();
   const users = snapshotVal(snapshot) || {};
@@ -853,6 +867,31 @@ app.get('/api/admin-tokens/stream', async (req, res) => {
   // Remove client on close
   req.on('close', () => {
     sseClients.delete(res);
+  });
+});
+
+// COMMENTS SSE stream - broadcasts comment create/delete events
+// Clients may connect with optional query params ?courseId=...&lessonId=... and optional ?token=<jwt> (for admin-only streams)
+app.get('/api/comments/stream', async (req, res) => {
+  // Allow anonymous viewers to receive comment updates for public pages
+  const courseId = req.query.courseId || null;
+  const lessonId = req.query.lessonId || null;
+
+  // Basic SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+
+  // send a simple welcome ping
+  res.write(`data: ${JSON.stringify({ welcome: 'comments-stream', courseId, lessonId })}\n\n`);
+
+  // add to client set
+  commentSseClients.add(res);
+
+  req.on('close', () => {
+    commentSseClients.delete(res);
   });
 });
 
@@ -1176,10 +1215,69 @@ app.post('/api/courses/:courseId/lessons/:lessonId/comments', async (req, res) =
     };
 
     await db.ref(`courses/${courseId}/lessons/${lessonId}/comments/${id}`).set(comment);
+    // Broadcast comment creation to SSE clients
+    try { broadcastCommentUpdate({ type: 'comment', action: 'created', courseId, lessonId, commentId: id, comment }); } catch (e) { /* ignore */ }
     res.status(201).json({ id, ...comment });
   } catch (e) {
     console.error('Create comment error:', e);
     res.status(500).json({ message: 'Server error creating comment.' });
+  }
+});
+
+// Admin: list all comments (flattened) for moderation
+app.get('/api/admin/comments', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader) return res.status(401).json({ message: 'Authorization header required.' });
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Bearer token required.' });
+    let payload;
+    try { payload = jwt.verify(token, JWT_SECRET); } catch (e) { return res.status(401).json({ message: 'Invalid or expired token.' }); }
+    if (payload.role !== 'admin') return res.status(403).json({ message: 'Admin access required.' });
+
+    const snap = await db.ref('courses').get();
+    const courses = snapshotVal(snap) || {};
+    const list = [];
+    Object.keys(courses).forEach(courseId => {
+      const course = courses[courseId] || {};
+      const lessons = course.lessons || {};
+      Object.keys(lessons).forEach(lessonId => {
+        const lesson = lessons[lessonId] || {};
+        const comments = lesson.comments || {};
+        Object.keys(comments).forEach(cId => {
+          const c = comments[cId] || {};
+          list.push({ courseId, lessonId, id: cId, text: c.text || '', author: c.author || '', role: c.role || '', parent: c.parent || null, created_at: c.created_at || null });
+        });
+      });
+    });
+    res.json({ comments: list });
+  } catch (e) {
+    console.error('Admin list comments error:', e);
+    res.status(500).json({ message: 'Server error listing comments.' });
+  }
+});
+
+// Admin: delete comment
+app.delete('/api/courses/:courseId/lessons/:lessonId/comments/:commentId', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization || req.headers.Authorization;
+    if (!authHeader) return res.status(401).json({ message: 'Authorization header required.' });
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Bearer token required.' });
+    let payload;
+    try { payload = jwt.verify(token, JWT_SECRET); } catch (e) { return res.status(401).json({ message: 'Invalid or expired token.' }); }
+    if (payload.role !== 'admin') return res.status(403).json({ message: 'Admin access required.' });
+
+    const { courseId, lessonId, commentId } = req.params;
+    if (!courseId || !lessonId || !commentId) return res.status(400).json({ message: 'Missing identifiers.' });
+
+    await db.ref(`courses/${courseId}/lessons/${lessonId}/comments/${commentId}`).set(null);
+    // Broadcast deletion
+    try { broadcastCommentUpdate({ type: 'comment', action: 'deleted', courseId, lessonId, commentId }); } catch (e) { /* ignore */ }
+    res.json({ message: 'Comment deleted.' });
+  } catch (e) {
+    console.error('Delete comment error:', e);
+    res.status(500).json({ message: 'Server error deleting comment.' });
   }
 });
 
@@ -1712,6 +1810,25 @@ async function generateCoursePage(id, course) {
         const actions = document.getElementById('course-actions');
         if(actions) actions.innerHTML = '<a class="btn" href="/Tii/upload-lesson.html?course=' + COURSE_ID + '">Add Lesson</a>';
       }
+
+      // Set up EventSource to receive comment create/delete events and refresh affected lesson comments
+      try {
+        const esUrlBase = apiBase + '/api/comments/stream?courseId=' + encodeURIComponent(COURSE_ID);
+        const esUrl = esUrlBase + (token ? ('&token=' + encodeURIComponent(token)) : '');
+        const es = new EventSource(esUrl);
+        es.onmessage = function(ev){
+          try {
+            const payload = JSON.parse(ev.data || '{}');
+            if (!payload || !payload.type) return;
+            if (payload.type === 'comment' && payload.courseId === COURSE_ID) {
+              // If lessonId provided, refresh that lesson's comments, otherwise refresh all
+              if (payload.lessonId) loadComments(payload.lessonId);
+              else document.querySelectorAll('.comments-section').forEach(s => loadComments(s.dataset.lessonId));
+            }
+          } catch(e) { /* ignore parse errors */ }
+        };
+        es.onerror = function(){ try { es.close(); } catch(e){} };
+      } catch (e) { /* ignore EventSource failures */ }
     })();
   </script>
 

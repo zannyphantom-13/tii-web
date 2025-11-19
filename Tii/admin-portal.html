@@ -440,6 +440,25 @@
             <!-- Admin Courses: dynamic list for quick actions (Open / Add Lesson / Manage) -->
             <h3>Courses</h3>
             <div id="admin-courses" class="tii-ad-courses-grid" aria-live="polite"></div>
+            
+            <h3>Comments Moderation</h3>
+            <p class="section-description">View and remove inappropriate comments posted by students or guests.</p>
+            <div id="comments-moderation" style="margin-top:12px;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="text-align:left;border-bottom:1px solid #e0e0e0;padding:6px;">
+                            <th style="padding:8px;">Course</th>
+                            <th style="padding:8px;">Lesson</th>
+                            <th style="padding:8px;">Author</th>
+                            <th style="padding:8px;">Role</th>
+                            <th style="padding:8px;">Text</th>
+                            <th style="padding:8px;">When</th>
+                            <th style="padding:8px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="comments-tbody"></tbody>
+                </table>
+            </div>
         </div>
     </main>
 
@@ -835,7 +854,81 @@
             // Initialize admin courses on load
             document.addEventListener('DOMContentLoaded', () => {
                 fetchAdminCourses();
+                fetchModerationComments();
             });
+
+            // -----------------------
+            // Comments moderation
+            // -----------------------
+            async function fetchModerationComments(){
+                const authToken = localStorage.getItem('authToken');
+                if (!authToken) return;
+                try{
+                    const resp = await fetch(`${API_URL}/api/admin/comments`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                    if (!resp.ok) { console.warn('Failed to fetch comments for moderation'); return; }
+                    const data = await resp.json();
+                    renderModerationComments(data.comments || []);
+                } catch(err){ console.error('Error fetching moderation comments', err); }
+            }
+
+            function renderModerationComments(list){
+                const tbody = document.getElementById('comments-tbody');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                if (!list.length){
+                    tbody.innerHTML = '<tr><td colspan="7" style="padding:12px;color:#666;">No comments found</td></tr>';
+                    return;
+                }
+                list.forEach(c => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${escapeHtml(c.courseId)}</td>
+                        <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${escapeHtml(c.lessonId)}</td>
+                        <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${escapeHtml(c.author)}</td>
+                        <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${escapeHtml(c.role)}</td>
+                        <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${escapeHtml((c.text || '').slice(0,200))}</td>
+                        <td style="padding:8px;border-bottom:1px solid #f0f0f0;">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</td>
+                        <td style="padding:8px;border-bottom:1px solid #f0f0f0;"><button class="delete-comment-btn" data-course="${escapeHtml(c.courseId)}" data-lesson="${escapeHtml(c.lessonId)}" data-id="${escapeHtml(c.id)}" style="padding:6px 8px;background:#c0392b;color:white;border:none;border-radius:4px;cursor:pointer;">Delete</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                // attach handlers
+                tbody.querySelectorAll('.delete-comment-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const courseId = btn.getAttribute('data-course');
+                        const lessonId = btn.getAttribute('data-lesson');
+                        const id = btn.getAttribute('data-id');
+                        const authToken = localStorage.getItem('authToken');
+                        if (!authToken) { alert('Admin token required'); return; }
+                        if (!confirm('Delete this comment?')) return;
+                        try{
+                            const resp = await fetch(`${API_URL}/api/courses/${encodeURIComponent(courseId)}/lessons/${encodeURIComponent(lessonId)}/comments/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${authToken}` } });
+                            const result = await resp.json();
+                            if (resp.ok) fetchModerationComments(); else alert(result.message || 'Failed to delete comment');
+                        } catch(err){ console.error(err); alert('Network error deleting comment'); }
+                    });
+                });
+            }
+
+            // Escape helper for admin rendering
+            function escapeHtml(s){ if (s===null || s===undefined) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+            // Start SSE for comment moderation updates (admin view)
+            (function startCommentsSSE(){
+                const authToken = localStorage.getItem('authToken');
+                if (!authToken || !window.EventSource) return;
+                try{
+                    const es = new EventSource(`${API_URL}/api/comments/stream?token=${encodeURIComponent(authToken)}`);
+                    es.onmessage = (ev) => {
+                        try{
+                            const p = JSON.parse(ev.data || '{}');
+                            if (p && p.type === 'comment') fetchModerationComments();
+                        } catch(e) { /* ignore */ }
+                    };
+                    es.onerror = () => { try{ es.close(); } catch(e){} };
+                } catch(e) { console.warn('Comments SSE unavailable', e); }
+            })();
     </script>
     
     </body>
