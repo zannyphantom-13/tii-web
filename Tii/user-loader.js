@@ -32,8 +32,10 @@ const adminPages = ["admin.html", "admin-portal.html", "manage-users.html"];
  * If the user is logged in and tries to access a login-related page, send them to the main portal (index.html).
  */
 if (isLoggedIn && loginPages.includes(currentPage)) {
-    // Redirect to the Tii index page explicitly
-    window.location.href = "/Tii/index.html";
+    // Redirect logged-in users away from login pages to their portal (admin -> admin portal)
+    const role = localStorage.getItem('userRole');
+    if (role === 'admin') window.location.href = '/Tii/admin-portal.html';
+    else window.location.href = '/Tii/portal.html';
 }
 
 /**

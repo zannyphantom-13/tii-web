@@ -120,7 +120,7 @@
 </head>
 <body class="login-body">
     <header>
-        <a href="index.html">
+        <a href="/Tii/index.html">
             <div class="logo-container">
                 <svg class="logo-icon" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                     <polygon points="50,5 90,30 90,70 50,95 10,70 10,30" fill="transparent" stroke="#2a6e62" stroke-width="5"/>
@@ -131,12 +131,12 @@
             </div>
         </a>
         <nav class="main-nav">
-            <a href="curriculum.html">Curriculum</a>
-            <a href="lessons.html">Weekly Lessons</a>
-            <a href="portal.html">Student Portal</a>
-            <a href="feedback.html">Feedback</a>
+            <a href="/Tii/curriculum.html">Curriculum</a>
+            <a href="/Tii/lessons.html">Weekly Lessons</a>
+            <a href="/Tii/portal.html">Student Portal</a>
+            <a href="/Tii/feedback.html">Feedback</a>
         </nav>
-        <a id="auth-button" href="login.html" class="auth-btn">Login</a>
+        <a id="auth-button" href="/Tii/login.html" class="auth-btn">Login</a>
     </header>
 
     <main class="login-main">
@@ -206,7 +206,7 @@
             if (!token) {
                 errorDiv.textContent = '❌ You must be logged in to edit your profile.';
                 errorDiv.style.display = 'block';
-                setTimeout(() => window.location.href = 'login.html', 2000);
+                setTimeout(() => window.location.href = '/Tii/login.html', 2000);
                 return;
             }
 
@@ -272,7 +272,7 @@
                 if (response.ok) {
                     successDiv.textContent = '✅ Profile updated successfully!';
                     successDiv.style.display = 'block';
-                    setTimeout(() => window.location.href = 'profile.html', 2000);
+                    setTimeout(() => window.location.href = '/Tii/profile.html', 2000);
                 } else {
                     errorDiv.textContent = `❌ ${result.message || 'Failed to update profile'}`;
                     errorDiv.style.display = 'block';
@@ -286,7 +286,7 @@
 
         // Go back to profile page
         function goBack() {
-            window.location.href = 'profile.html';
+            window.location.href = '/Tii/profile.html';
         }
 
         // Load profile on page load
