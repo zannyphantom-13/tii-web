@@ -109,12 +109,7 @@
             }
         }catch(e){ rl.innerHTML = '<p>Error loading lessons.</p>'; console.error(e) }
 
-        // show admin actions when token exists
-        const token = localStorage.getItem('token') || localStorage.getItem('authToken');
-        if(token){
-            const actions = document.getElementById('course-actions');
-            actions.innerHTML = `<a class="btn" href="/Tii/upload-lesson.html?course=${COURSE_ID}">Add Lesson</a>`;
-        }
+        // Admin actions intentionally omitted on static course pages to avoid in-page lesson uploads.
     })();
     </script>
     <script type="module">
