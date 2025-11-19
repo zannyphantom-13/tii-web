@@ -15,7 +15,7 @@ body {
 }
 
 :root {
-    --added-badge-bg: #ff8a65; /* orange-ish default */
+    --added-badge-bg: #d32f2f; /* red for uploaded courses */
     --added-badge-color: #ffffff;
     --course-card-gap: 18px;
     --course-card-padding: 18px;
@@ -396,20 +396,46 @@ main {
 
 /* Highlight for uploaded / dynamically-added courses */
 .other-course-card.uploaded {
-    border-color: rgba(34, 153, 84, 0.28);
-    background: linear-gradient(180deg, #ffffff 0%, #fbfff9 50%, #f3fff6 100%);
+    border-color: rgba(211, 47, 47, 0.32);
+    background: linear-gradient(180deg, #fffaf9 0%, #fff4f4 50%, #fff0f0 100%);
+    box-shadow: 0 12px 28px rgba(211,47,47,0.06);
 }
 
 .other-course-card .course-badge {
     position: absolute;
     top: 12px;
     right: 12px;
-    background: linear-gradient(90deg, var(--added-badge-bg, #ffb74d), var(--added-badge-bg, #ff8a65));
+    background: linear-gradient(90deg, var(--added-badge-bg, #d32f2f), var(--added-badge-bg, #b71c1c));
     color: var(--added-badge-color, #fff);
     padding: 6px 8px;
     font-size: 12px;
     border-radius: 999px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+
+/* Small CTA used for admin 'Add Lesson' inside cards */
+.mini-cta {
+    display: inline-block;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid #d32f2f;
+    color: #d32f2f;
+    border-radius: 6px;
+    font-size: 13px;
+    text-decoration: none;
+}
+.mini-cta:hover { background:#fff4f4; }
+
+/* Inline manage variant to visually distinguish admin manage button */
+.mini-cta.manage-inline {
+    border-color: #1f5047;
+    color: #1f5047;
+}
+.mini-cta.manage-inline:hover { background:#eef7f6; }
+
+/* Ensure manage button inside card is visible and above other content */
+.other-course-card .manage-btn {
+    z-index: 6;
 }
 
 .other-course-card::before {

@@ -1450,132 +1450,70 @@ async function generateCoursePage(id, course) {
     const safeDesc = (course && course.description) ? String(course.description).replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
     const placementLabel = (course && course.placement === 'curriculum') ? 'Curriculum' : ((course && course.placement) ? String(course.placement) : 'Other');
 
-    const html = `<!doctype html>
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>${safeTitle} — The Informatics Initiative</title>
   <link rel="stylesheet" href="/Tii/styles.css">
-  <style>
-    body { background: #f7fafc; padding: 0; }
-    .course-hero { max-width: 900px; margin: 32px auto 0 auto; background: #fff; padding: 32px 28px 24px 28px; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.07); }
-    .course-meta { color: #2a6e62; margin-bottom: 18px; font-size: 1.1em; }
-    .course-body { color: #444; margin-bottom: 18px; font-size: 1.15em; }
-    .lesson-list { margin-top: 18px; display: flex; flex-direction: column; gap: 18px; }
-    .lesson-card { background: #f9fffa; border: 1px solid #e6f4ef; border-radius: 8px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
-    .lesson-title { font-size: 1.2em; color: #2a6e62; margin-bottom: 6px; }
-    .lesson-meta { color: #666; font-size: 0.98em; margin-bottom: 8px; }
-    .lesson-img { max-width: 320px; border-radius: 6px; border: 1px solid #eee; margin-top: 8px; }
-    .lesson-resource { margin-top: 8px; display: inline-block; }
-    .lesson-other { margin-top: 8px; color: #666; font-style: italic; }
-    .lesson-summary-btn { width: 100%; text-align: left; background: transparent; border: 0; padding: 0; cursor: pointer; }
-    .lesson-summary-inner { padding: 10px 0; }
-    .lesson-preview { color: #444; margin-top: 8px; }
-    .lesson-details { display: none; margin-top: 12px; border-top: 1px dashed #e6f4ef; padding-top: 12px; }
-    .lesson-details.show { display: block; }
-  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-  <a href="/Tii/index.html" style="margin-left:32px;display:inline-block;margin-top:18px;color:#2a6e62">← Back to Home</a>
+  <header>
+    <a href="/Tii/index.html"><div class="logo-container"><h1>THE INFORMATICS INITIATIVE</h1></div></a>
+    <nav class="main-nav">
+      <a href="/Tii/curriculum.html">Curriculum</a>
+      <a href="/Tii/lessons.html">Weekly Lessons</a>
+      <a href="/Tii/portal.html">Student Portal</a>
+      <a href="/Tii/feedback.html">Feedback</a>
+    </nav>
+    <a id="auth-button" href="/Tii/login.html" class="login-btn">Login</a>
+  </header>
+
   <main>
     <div class="course-hero">
-      <h1 style="font-size:2.2em;color:#2a6e62;margin-bottom:8px;">${safeTitle}</h1>
-      <div class="course-meta">${placementLabel} • Added by ${course.created_by || 'admin'} on ${new Date(course.created_at).toLocaleString()}</div>
-      <div class="course-body">${safeDesc}</div>
-      <div class="lesson-list" id="lesson-list">
-        <p style="color:#666">Loading lessons…</p>
-      </div>
-      <div style="margin-top:24px;"><a class="explore-btn-secondary" href="/Tii/curriculum.html">Back to courses</a></div>
+      <h1>${safeTitle}</h1>
+      <div class="course-meta">${placementLabel} • ${course.created_by ? `Added by ${course.created_by}` : 'Public'}</div>
+      <div class="course-body" id="course-description">${safeDesc}</div>
+      <div id="course-actions" style="margin-top:12px;"></div>
+      <div id="lessons" class="lesson-list">Loading lessons...</div>
     </div>
   </main>
+
+  <footer><p>&copy; ${new Date().getFullYear()} The Informatics Initiative</p></footer>
+
   <script>
-    (async function(){
-      const courseId = '${id}';
-      const listEl = document.getElementById('lesson-list');
-      try {
-        const resp = await fetch('/api/courses/' + courseId + '/lessons');
-        if (!resp.ok) { listEl.innerHTML = '<p style="color:#c0392b">Failed to load lessons.</p>'; return; }
-        const data = await resp.json();
-        const lessons = data.lessons || [];
-        if (!lessons.length) { listEl.innerHTML = '<p style="color:#666">No lessons yet. Admins can upload lessons from the admin portal.</p>'; return; }
-        listEl.innerHTML = '';
-        lessons.forEach(l => {
-          const div = document.createElement('div');
-          div.className = 'lesson-card';
-
-          // Summary button
-          const btn = document.createElement('button');
-          btn.className = 'lesson-summary-btn';
-          const inner = document.createElement('div');
-          inner.className = 'lesson-summary-inner';
-          const title = document.createElement('div');
-          title.className = 'lesson-title';
-          title.textContent = l.title || 'Untitled';
-          inner.appendChild(title);
-          const metaParts = [];
-          if (l.topic) metaParts.push('Topic: ' + l.topic);
-          if (l.weeks) metaParts.push('Weeks: ' + l.weeks);
-          if (l.date) metaParts.push('Date: ' + l.date);
-          if (metaParts.length) {
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'lesson-meta';
-            metaDiv.textContent = metaParts.join(' | ');
-            inner.appendChild(metaDiv);
-          }
-          if (l.content && l.content.length > 140) {
-            const preview = document.createElement('div');
-            preview.className = 'lesson-preview';
-            preview.textContent = (l.content || '').substring(0, 140).trim() + '...';
-            inner.appendChild(preview);
-          } else if (l.content) {
-            const preview = document.createElement('div');
-            preview.className = 'lesson-preview';
-            preview.textContent = l.content || '';
-            inner.appendChild(preview);
-          }
-          btn.appendChild(inner);
-
-          // Details (hidden until toggle)
-          const details = document.createElement('div');
-          details.className = 'lesson-details';
-          if (l.image_url) {
-            const img = document.createElement('img');
-            img.className = 'lesson-img';
-            img.src = l.image_url;
-            img.alt = 'lesson image';
-            details.appendChild(img);
-          }
-          if (l.resource_url) {
-            const a = document.createElement('a');
-            a.className = 'lesson-resource explore-btn-secondary';
-            a.href = l.resource_url;
-            a.target = '_blank';
-            a.textContent = 'Open Resource';
-            details.appendChild(a);
-          }
-          if (l.other_info) {
-            const oi = document.createElement('div');
-            oi.className = 'lesson-other';
-            oi.textContent = l.other_info;
-            details.appendChild(oi);
-          }
-          if (l.content) {
-            const c = document.createElement('div');
-            c.style.marginTop = '10px';
-            c.style.color = '#444';
-            c.innerHTML = (l.content || '').replace(/\n/g, '<br/>');
-            details.appendChild(c);
-          }
-
-          btn.addEventListener('click', function(){ details.classList.toggle('show'); btn.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-
-          div.appendChild(btn);
-          div.appendChild(details);
-          listEl.appendChild(div);
+  (async function(){
+    const COURSE_ID = '${id}';
+    const apiBase = '';
+    const rl = document.getElementById('lessons');
+    const actions = document.getElementById('course-actions');
+    try{
+      const res = await fetch(`/api/courses/${id}/lessons`);
+      if(!res.ok) return rl.innerHTML = '<p>Failed to load lessons.</p>';
+      const data = await res.json();
+      const list = data.lessons || data;
+      if(!list || !list.length) { rl.innerHTML = '<p>No lessons yet.</p>'; }
+      else {
+        rl.innerHTML = '';
+        list.forEach(ls => {
+          const card = document.createElement('div');
+          card.className = 'lesson-card';
+          card.innerHTML = `<h3 class="lesson-title">${(ls.title||'').replace(/"/g,'\"')}</h3><div class="lesson-meta">${(ls.topic||'')}</div><div>${(ls.content||'')}</div>`;
+          rl.appendChild(card);
         });
-      } catch (e) { listEl.innerHTML = '<p style="color:#c0392b">Network error loading lessons.</p>'; }
-    })();
+      }
+    }catch(e){ rl.innerHTML = '<p>Error loading lessons.</p>'; console.error(e) }
+
+    const token = localStorage.getItem('authToken');
+    if(token && actions) actions.innerHTML = `<a class="btn" href="/Tii/upload-lesson.html?course=${COURSE_ID}">Add Lesson</a>`;
+  })();
+  </script>
+
+  <script type="module">
+    import { handleAuthButton, updatePortalLink } from '/Tii/auth.js';
+    updatePortalLink(); handleAuthButton();
   </script>
 </body>
 </html>`;

@@ -67,6 +67,9 @@
                     <span class="explore-btn-secondary" style="display:inline-block;width:auto;padding:8px 14px;margin-top:12px">Open</span>
                 </a>
             </div>
+            <div style="text-align:center; margin-top:18px;">
+                <a class="explore-btn-secondary" href="other-courses.html">Other Courses</a>
+            </div>
         </div>
         <script>
         // Fetch persisted courses that have placement === 'curriculum' and render them into the card grid
@@ -104,51 +107,59 @@
                         a.appendChild(badge);
                     }
 
-                    // Placeholder SVG (inline via data URL) used when no thumbnail provided
-                    const placeholderSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="100%" height="100%" fill="%23f3fff6"/><g fill="%232a6e62" opacity="0.08"><rect x="0" y="0" width="640" height="360"/></g><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%232a6e62" font-family="Arial, sans-serif" font-size="28">Course Image</text></svg>';
-                    const placeholder = 'data:image/svg+xml;utf8,' + encodeURIComponent(placeholderSvg);
-
-                    // Thumbnail support (thumbnail, image_url, icon) — fallback to placeholder
+                    // Thumbnail support (thumbnail, image_url, icon) — only render when present
                     const thumb = c.thumbnail || c.image_url || c.icon || '';
-                    const img = document.createElement('img');
-                    img.src = thumb || placeholder;
-                    img.alt = c.title || 'course';
-                    // let CSS control image sizing to keep responsive behavior consistent
-                    img.style.objectFit = 'cover';
-                    img.style.borderRadius = '6px';
-                    img.style.marginBottom = '10px';
-                    a.appendChild(img);
+                    if (thumb) {
+                        const img = document.createElement('img');
+                        img.src = thumb;
+                        img.alt = c.title || 'course';
+                        img.style.objectFit = 'cover';
+                        img.style.borderRadius = '6px';
+                        img.style.marginBottom = '10px';
+                        a.appendChild(img);
+                    }
 
+                    // Match static card structure: title, description, then actions
                     const h = document.createElement('h4'); h.textContent = c.title || 'Untitled';
                     const p = document.createElement('p'); p.textContent = c.description || '';
-                    const btn = document.createElement('span'); btn.className = 'explore-btn-secondary'; btn.style.display='inline-block'; btn.style.width='auto'; btn.style.padding='8px 14px'; btn.style.marginTop='12px'; btn.textContent = 'Open';
-                    a.appendChild(h); a.appendChild(p); a.appendChild(btn);
+                    a.appendChild(h); a.appendChild(p);
+
+                    // Actions container (keeps same visual structure as static cards)
+                    const actionsWrap = document.createElement('div');
+                    actionsWrap.style.display = 'flex';
+                    actionsWrap.style.gap = '8px';
+                    actionsWrap.style.alignItems = 'center';
+                    actionsWrap.style.marginTop = '12px';
+
+                    const openBtn = document.createElement('a');
+                    openBtn.className = 'explore-btn-secondary';
+                    openBtn.href = c.url || `courses/${c.id}.html`;
+                    openBtn.target = '_blank';
+                    openBtn.textContent = 'Open';
+                    openBtn.style.display = 'inline-block';
+                    openBtn.style.width = 'auto';
+                    openBtn.style.padding = '8px 14px';
+                    actionsWrap.appendChild(openBtn);
 
                     // Admin-only actions for uploaded courses: visible when auth token exists
                     const token = localStorage.getItem('authToken');
                     if (token && c.id){
-                        // Add Lesson button (links to upload-lesson with ?course=id)
                         const addLink = document.createElement('a');
                         addLink.href = '/Tii/upload-lesson.html?course=' + encodeURIComponent(c.id);
-                        addLink.className = 'explore-btn-secondary';
-                        addLink.style.marginLeft = '8px';
+                        addLink.className = 'mini-cta';
                         addLink.textContent = 'Add Lesson';
-                        // Small wrapper so it doesn't take full width
-                        const wrapper = document.createElement('div');
-                        wrapper.style.marginTop = '10px';
-                        wrapper.appendChild(addLink);
-                        a.appendChild(wrapper);
+                        actionsWrap.appendChild(addLink);
 
-                        // Manage button
-                        const manageBtn = document.createElement('button');
-                        manageBtn.className = 'manage-btn';
+                        // Manage button (inline within actions for consistent layout)
+                        const manageBtn = document.createElement('a');
+                        manageBtn.className = 'mini-cta manage-inline';
                         manageBtn.textContent = 'Manage';
-                        manageBtn.onclick = function(e){
-                            e.preventDefault(); e.stopPropagation();
-                            window.location.href = '/Tii/admin-portal.html?edit_course=' + encodeURIComponent(c.id);
-                        };
-                        a.appendChild(manageBtn);
+                        manageBtn.href = '/Tii/admin-portal.html?edit_course=' + encodeURIComponent(c.id);
+                        actionsWrap.appendChild(manageBtn);
                     }
+
+                    // append action wrapper
+                    a.appendChild(actionsWrap);
 
                     return a;
                 }
