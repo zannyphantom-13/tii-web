@@ -501,22 +501,21 @@ export function initializeAdminLogin() {
     
     // Ensure forms are correctly initialized (Step 1 visible, Step 2 hidden)
     if (step1Form && step2Form) {
-        // We ensure Step 2 is hidden initially, in case of browser back button behavior
-                    if (result.role === 'admin') {
-                        window.location.href = '/Tii/admin-portal.html'; // Redirect to admin portal with absolute path
+        step1Form.classList.remove('hidden');
+        step2Form.classList.add('hidden');
     }
-                        window.location.href = '/Tii/portal.html'; // Redirect to student portal with absolute path
+
     // Attach event listeners
     if (step1Form) {
         step1Form.addEventListener('submit', handleAdminLoginStep1);
     }
-    
+
     if (step2Form) {
         step2Form.addEventListener('submit', handleAdminTokenVerification);
     }
-    
+
     if (resendButton) {
-        // Corrected: Use async callback for await
+        // Use async callback for await
         resendButton.addEventListener('click', async () => {
             if (adminEmail) {
                 await sendAdminToken(adminEmail); // Ensure we wait for the send operation
