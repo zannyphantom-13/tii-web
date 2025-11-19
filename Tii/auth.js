@@ -34,17 +34,30 @@ export function setupPasswordToggles() {
 ============================================ */
 export function handleAuthButton() {
     const authButton = document.getElementById('auth-button');
-    if (authButton && localStorage.getItem('authToken')) {
-        authButton.textContent = 'Logout';
-        authButton.href = '#';
-        authButton.addEventListener('click', (e) => {
+    if (!authButton) return;
+
+    // Remove any existing event listeners by replacing the node with a cloned node
+    const fresh = authButton.cloneNode(true);
+    authButton.parentNode.replaceChild(fresh, authButton);
+
+    // Now operate on the fresh node
+    const btn = document.getElementById('auth-button');
+
+    const token = localStorage.getItem('authToken');
+    if (token) {
+        btn.textContent = 'Logout';
+        btn.href = '#';
+        btn.addEventListener('click', (e) => {
             e.preventDefault();
             logout(); // Calls the exported logout function below
         });
-    } else if (authButton) {
-        authButton.textContent = 'Login';
-        authButton.href = '/Tii/login.html'; // Use absolute Tii path so links work consistently from any page
+    } else {
+        btn.textContent = 'Login';
+        btn.href = '/Tii/login.html'; // Use absolute Tii path so links work consistently from any page
     }
+
+    // Update portal link text/href when auth state changes
+    try { updatePortalLink(); } catch (e) { /* ignore if not available */ }
 }
 
 /* ============================================

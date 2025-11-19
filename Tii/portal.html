@@ -87,10 +87,11 @@
         </div>
     </footer>
     <script type="module">
-    import { handleProfileFetch, handleAuthButton } from './auth.js';
+    import { handleProfileFetch, handleAuthButton, updatePortalLink } from './auth.js';
 
     handleAuthButton();
     handleProfileFetch(); // Retrieves and sets the user's name
+    updatePortalLink(); // Ensure the Portal link matches the user's role
     </script>
 </body>
 </html>
