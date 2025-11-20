@@ -14,7 +14,7 @@
             window.location.href = '/Tii/login.html';
         }
     </script>
-    <script src='user-loader.js'></script>
+    <script src='/Tii/user-loader.js' defer></script>
 <body>
     <header>
         <a href="/Tii/index.html">
@@ -89,7 +89,7 @@
         </div>
     </footer>
     <script type="module">
-        import { handleAuthButton, updatePortalLink } from './auth.js';
+        import { handleAuthButton, updatePortalLink } from '/Tii/auth.js';
         handleAuthButton();
         updatePortalLink();
     </script>

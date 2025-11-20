@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delete Course - Admin</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="user-loader.js"></script>
+    <script src="/Tii/user-loader.js" defer></script>
 </head>
 <body>
     <header>
@@ -17,7 +17,7 @@
         <div id="delete-course-message" style="margin-top:12px;"></div>
     </main>
     <script type="module">
-    import { handleAuthButton } from './auth.js';
+    import { handleAuthButton } from '/Tii/auth.js';
     handleAuthButton();
 
     const API_URL = window.location.origin || 'http://localhost:3000';

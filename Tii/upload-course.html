@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Course - Admin</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="user-loader.js"></script>
+    <script src="/Tii/user-loader.js" defer></script>
 </head>
 <body>
     <header>
         <a href="/Tii/admin-portal.html">← Back to Admin</a>
+        <a id="auth-button" href="/Tii/login.html" class="login-btn">Login</a>
     </header>
     <main style="max-width:800px;margin:40px auto;">
         <h2>Add New Course (Admin Only)</h2>
@@ -82,6 +83,10 @@
             } catch(err){ console.error(err); out.style.color='#c0392b'; out.textContent = 'Network error: '+err.message; }
         });
     })();
+    </script>
+    <script type="module">
+        import { handleAuthButton, updatePortalLink } from '/Tii/auth.js';
+        try { handleAuthButton(); updatePortalLink(); } catch(e) { /* graceful fallback */ }
     </script>
 </body>
 </html>

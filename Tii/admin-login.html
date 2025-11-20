@@ -76,11 +76,11 @@
   </footer>
 
   <!-- Load global user scripts first -->
-  <script type="module" src="./user-loader.js"></script>
+  <script src="/Tii/user-loader.js" defer></script>
   
   <!-- Load main auth logic, which contains the new initializeAdminLogin function -->
   <script type="module">
-    import { initializeAdminLogin } from './auth.js';
+    import { initializeAdminLogin } from '/Tii/auth.js';
     
     // This single function will set up everything for this page
     initializeAdminLogin();
