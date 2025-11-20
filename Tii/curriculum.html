@@ -168,20 +168,59 @@
                     return v === 'curriculum' || v === 'list' || v === 'display as list' || v.indexOf('curr') !== -1;
                 }
 
-                // Render any course whose placement resolves to curriculum (including uploaded courses explicitly placed in 'curriculum')
+                // Render any course whose placement resolves to curriculum.
+                // Strategy: render canonical/static curriculum courses first in the preferred order,
+                // then append uploaded/generated courses afterwards so newly-added courses appear after existing ones.
                 function renderCourses(list){
                     const seen = new Set();
-                    list
-                        .filter(c => placementIsCurriculum(c.placement) && c.title && c.title.trim() !== '' )
-                        .forEach(c => {
-                            const titleKey = (c.title||'').trim();
-                            if (!titleKey) return;
-                            if (seen.has(titleKey)) return; seen.add(titleKey);
-                            const exists = Array.from(grid.querySelectorAll('.other-course-card')).some(card => card.querySelector('h4') && card.querySelector('h4').textContent.trim() === titleKey);
-                            if (exists) return;
+                    // normalize input list
+                    const courses = (list || []).filter(c => placementIsCurriculum(c.placement) && c.title && c.title.trim() !== '');
+
+                    // Preferred static order for curriculum (ensure these appear first if present)
+                    const preferred = [
+                        'Programming',
+                        'Data Analysis',
+                        'Drug Discovery',
+                        'Computational Chemistry',
+                        'Bioinformatics'
+                    ];
+
+                    // Map by title for quick lookup (case-insensitive match)
+                    const byTitle = new Map();
+                    courses.forEach(c => byTitle.set((c.title||'').trim().toLowerCase(), c));
+
+                    // 1) Render preferred static titles in order when present
+                    preferred.forEach(t => {
+                        const key = (t||'').trim().toLowerCase();
+                        const c = byTitle.get(key);
+                        if(c && !seen.has(key)){
                             const card = createCourseCard(c);
                             grid.appendChild(card);
-                        });
+                            seen.add(key);
+                        }
+                    });
+
+                    // 2) Render any remaining non-uploaded/static courses (those not marked as uploaded)
+                    courses.forEach(c => {
+                        const key = (c.title||'').trim().toLowerCase();
+                        if(seen.has(key)) return;
+                        // treat uploaded/generated markers specially: skip for now
+                        if(isUploadedCourse(c)) return;
+                        const card = createCourseCard(c);
+                        grid.appendChild(card);
+                        seen.add(key);
+                    });
+
+                    // 3) Finally append uploaded/generated courses in the order returned by the API
+                    courses.forEach(c => {
+                        const key = (c.title||'').trim().toLowerCase();
+                        if(seen.has(key)) return;
+                        if(isUploadedCourse(c)){
+                            const card = createCourseCard(c);
+                            grid.appendChild(card);
+                            seen.add(key);
+                        }
+                    });
                 }
 
                 // Expose a loader that can be re-run by other tabs via BroadcastChannel or storage events
