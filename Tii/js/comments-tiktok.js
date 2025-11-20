@@ -52,6 +52,8 @@
 
     function renderComment(c, lessonId){
       const box = el('div',{class:'tt-comment'});
+      // ensure relative positioning for absolute menu
+      box.style.position = 'relative';
       if(c && c.id) box.dataset.commentId = c.id;
       const av = el('div',{class:'tt-avatar'}, initials(c.author));
       const body = el('div',{class:'tt-body'});
@@ -62,7 +64,7 @@
       body.appendChild(meta);
       body.appendChild(el('div',{class:'tt-text'}, c.text));
 
-      // actions: like, reply, delete
+      // actions: like, reply, (menu for delete)
       const actions = el('div',{class:'tt-actions'});
       const likeBtn = el('button',{class:'tt-btn tt-like'}, `♥ ${getLikeCount(c.id)}`);
       likeBtn.addEventListener('click', ()=>{ toggleLike(c.id); likeBtn.textContent = `♥ ${getLikeCount(c.id)}`; });
@@ -71,8 +73,21 @@
       const replyBtn = el('button',{class:'tt-btn'}, 'Reply');
       actions.appendChild(replyBtn);
 
+      // Three-dot menu for additional actions (Delete). Shown only when user can delete (owner or admin)
       const canDelete = canCurrentUserDelete(c);
-      if(canDelete){ const del = el('button',{class:'tt-btn tt-delete'}, 'Delete'); del.addEventListener('click', async ()=>{ if(!confirm('Delete comment?')) return; await deleteComment(lessonId,c.id); loadComments(); }); actions.appendChild(del); }
+      if (canDelete){
+        const menuBtn = el('button',{class:'tt-btn tt-menu'}, '⋯');
+        menuBtn.style.padding = '6px 10px'; menuBtn.style.fontSize = '18px'; menuBtn.style.lineHeight='1';
+        const menuPopup = el('div',{class:'tt-menu-popup', style:'display:none;position:absolute;right:8px;top:36px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,0.12);z-index:1000'});
+        const del = el('button',{class:'tt-btn tt-delete-small', style:'background:none;border:none;color:#c0392b;padding:6px 10px;cursor:pointer;'}, 'Delete');
+        del.addEventListener('click', async ()=>{ if(!confirm('Delete comment?')) return; await deleteComment(lessonId,c.id); loadComments(); });
+        menuPopup.appendChild(del);
+        // toggle
+        menuBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); menuPopup.style.display = menuPopup.style.display==='none'?'block':'none'; });
+        // close on outside click
+        document.addEventListener('click', ()=>{ try{ menuPopup.style.display='none'; }catch(e){} });
+        actions.appendChild(menuBtn); actions.appendChild(menuPopup);
+      }
 
       body.appendChild(actions);
 
@@ -94,6 +109,7 @@
 
     function renderReply(r, lessonId, parent){
       const box = el('div',{class:'tt-reply'});
+      box.style.position = 'relative';
       // show chain like: replier > target
       const target = r.reply_to_name || parent && parent.author || '';
       const chain = target ? `${r.author} > ${target}` : r.author;
@@ -104,6 +120,20 @@
       const replyActions = el('div',{class:'tt-reply-actions'});
       const replyBtn = el('button',{class:'tt-btn tt-reply-small'}, 'Reply');
       replyActions.appendChild(replyBtn);
+
+      // three-dot menu for reply delete if permitted
+      const canDeleteReply = canCurrentUserDelete(r);
+      if (canDeleteReply){
+        const menuBtn = el('button',{class:'tt-btn tt-menu'}, '⋯');
+        menuBtn.style.padding = '4px 8px'; menuBtn.style.fontSize = '16px'; menuBtn.style.lineHeight='1';
+        const menuPopup = el('div',{class:'tt-menu-popup', style:'display:none;position:absolute;right:8px;top:8px;background:#fff;border:1px solid #ddd;border-radius:6px;padding:6px;box-shadow:0 6px 20px rgba(0,0,0,0.12);z-index:1000'});
+        const del = el('button',{class:'tt-btn tt-delete-small', style:'background:none;border:none;color:#c0392b;padding:6px 10px;cursor:pointer;'}, 'Delete');
+        del.addEventListener('click', async ()=>{ if(!confirm('Delete reply?')) return; await deleteComment(lessonId,r.id); loadComments(); });
+        menuPopup.appendChild(del);
+        menuBtn.addEventListener('click', (ev)=>{ ev.stopPropagation(); menuPopup.style.display = menuPopup.style.display==='none'?'block':'none'; });
+        document.addEventListener('click', ()=>{ try{ menuPopup.style.display='none'; }catch(e){} });
+        replyActions.appendChild(menuBtn); replyActions.appendChild(menuPopup);
+      }
       // small inline reply form
       const inlineForm = el('form',{class:'tt-reply-inline', style:'display:none;margin-top:8px'});
       const inlineTa = el('textarea',{class:'tt-input', placeholder:'Reply...'});
@@ -130,6 +160,8 @@
         if(token){
           const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
           if(payload){
+            // admins can delete any comment
+            if(payload.role && String(payload.role).toLowerCase()==='admin') return true;
             // check email, name, preferred_username, sub/uid against comment fields
             const possibles = [payload.email, payload.name, payload.preferred_username, payload.preferred_username, payload.sub, payload.uid].filter(Boolean).map(String);
             const authorVals = [c.author, c.author_email, c.author_id].filter(Boolean).map(String);
