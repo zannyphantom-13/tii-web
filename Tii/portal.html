@@ -8,12 +8,13 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script>
         // IMMEDIATE AUTH CHECK (Client-side Page Protection)
+        // Use absolute path so redirects work regardless of how the page was reached
         if (!localStorage.getItem('authToken')) {
             alert('You must be logged in to view this page.');
-            window.location.href = 'login.html';
+            window.location.href = '/Tii/login.html';
         }
     </script>
-    <script src='user-loader.js'></script>
+    <script src="/Tii/user-loader.js" defer></script>
 </head>
 <body>
     <header>
@@ -87,7 +88,7 @@
         </div>
     </footer>
     <script type="module">
-    import { handleProfileFetch, handleAuthButton } from './auth.js';
+    import { handleProfileFetch, handleAuthButton } from '/Tii/auth.js';
 
     handleAuthButton();
     handleProfileFetch(); // Retrieves and sets the user's name

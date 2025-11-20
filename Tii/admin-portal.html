@@ -6,7 +6,7 @@
     <title>Admin Dashboard - The Informatics Initiative</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <script src="user-loader.js" defer></script>
+    <script src="/Tii/user-loader.js" defer></script>
     <style>
         /* --- GLOBAL LAYOUT SETUP --- */
         body { 
@@ -432,7 +432,7 @@
         </div>
     </footer>
     <script type="module">
-        import { handleAuthButton, updatePortalLink, logout } from './auth.js';
+        import { handleAuthButton, updatePortalLink, logout } from '/Tii/auth.js';
         handleAuthButton();
         updatePortalLink();
         window.logout = logout;
@@ -481,10 +481,7 @@
             }
         });
         
-        // Placeholder logout function
-        function logout(url) {
-            console.log('Logging out and navigating to:', url);
-        }
+        // NOTE: `logout` is provided by `/Tii/auth.js` and exposed above.
 
         // --- MOBILE RESPONSIVENESS ---
         function handleMobileResponsiveness() {

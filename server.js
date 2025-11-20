@@ -52,15 +52,12 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/Tii', async (req, res, next) => {
   try {
     const protectedFiles = [
-      '/admin-portal.html',
       '/admin-profile.html',
-      '/admin-portal.html',
       '/ad-manager.html',
       '/ad-upload.html',
       '/upload-course.html',
       '/upload-lesson.html',
       '/profile.html',
-      '/portal.html',
       '/assignments.html'
     ];
     const reqPath = req.path || '';
