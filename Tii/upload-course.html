@@ -12,8 +12,9 @@
         <a href="/Tii/admin-portal.html">← Back to Admin</a>
         <a id="auth-button" href="/Tii/login.html" class="login-btn">Login</a>
     </header>
-    <main class="form-page-container">
-        <div class="form-card" style="max-width:800px;margin:40px auto;">
+    <main style="max-width:920px;margin:24px auto;display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;">
+        <section>
+        <div class="form-card" style="max-width:100%;margin:0;">
         <h2>Add New Course (Admin Only)</h2>
 
         <div id="not-admin-message" style="color:#555;margin-bottom:16px">
@@ -40,6 +41,15 @@
             <div id="upload-course-message" style="margin-top:12px;"></div>
         </form>
         </div>
+        </section>
+
+        <aside style="border-left:1px solid #eee;padding-left:18px;">
+            <h3>Existing Courses</h3>
+            <div id="existing-courses" style="margin-bottom:18px;">Loading...</div>
+
+            <h3>Recently Added</h3>
+            <div id="recent-courses">Loading...</div>
+        </aside>
     </main>
     <script>
     (function(){
@@ -84,6 +94,57 @@
                 }
             } catch(err){ console.error(err); out.style.color='#c0392b'; out.textContent = 'Network error: '+err.message; }
         });
+        
+        // populate side lists (existing courses + recent)
+        async function loadCourses(){
+            const existing = document.getElementById('existing-courses');
+            const recent = document.getElementById('recent-courses');
+            existing.innerHTML = 'Loading...'; recent.innerHTML = 'Loading...';
+            try{
+                const r = await fetch(API_URL + '/api/courses');
+                let courses = [];
+                if (!r.ok) {
+                    existing.innerHTML = '<div style="color:#666">Unable to load courses</div>';
+                    recent.innerHTML = '';
+                    return;
+                }
+                const data = await r.json();
+                courses = data.courses || [];
+                // sort by created_at desc
+                courses.sort((a,b)=> new Date(b.created_at||0)-new Date(a.created_at||0));
+
+                existing.innerHTML = '';
+                courses.forEach(c => {
+                    const d = document.createElement('div');
+                    d.style.padding = '6px 0';
+                    const href = (c && c.url && c.url.trim()) ? c.url : `/Tii/courses/${encodeURIComponent(c.id)}.html`;
+                    d.innerHTML = `<a href="${href}" target="_blank">${(c.title||c.id||'Untitled')}</a> <div style="font-size:12px;color:#666">${c.placement||'other'}</div>`;
+                    existing.appendChild(d);
+                });
+
+                recent.innerHTML = '';
+                courses.slice(0,6).forEach(c=>{
+                    const created = c.created_at ? new Date(c.created_at).toLocaleString() : '';
+                    const courseUrl = (c && c.url && c.url.trim()) ? c.url : (`/Tii/courses/${encodeURIComponent(c.id)}.html`);
+                    const thumb = c.thumbnail || c.image_url || c.icon || '';
+                    const item = document.createElement('div'); item.className='recent-item';
+                    let inner = '';
+                    if(thumb) inner += `<img class="recent-thumb" src="${thumb}" alt="${(c.title||'course').replace(/"/g,'')}">`;
+                    inner += `<div class="recent-meta"><strong><a href="${courseUrl}" target="_blank">${(c.title||'Untitled')}</a></strong><div class="date">${created}</div></div>`;
+                    item.innerHTML = inner;
+                    recent.appendChild(item);
+                });
+            }catch(e){ existing.innerHTML = '<div style="color:#c0392b">Network error</div>'; recent.innerHTML = ''; }
+        }
+
+        // small local styles for recent list (keeps page self-contained)
+        (function injectLocalStyles(){
+            const css = `#existing-courses { display:block; } .recent-item{ display:flex; gap:10px; align-items:center; padding:8px; border-radius:6px; background:#fff; border:1px solid #f0f0f0; margin-bottom:8px } .recent-thumb{ width:64px; height:48px; object-fit:cover; border-radius:6px; flex-shrink:0 } .recent-meta{ display:flex; flex-direction:column } .recent-meta strong{ color:#2a6e62 } .recent-meta .date{ font-size:12px; color:#666 }`;
+            const s = document.createElement('style'); s.appendChild(document.createTextNode(css)); document.head.appendChild(s);
+        })();
+
+        // call loader so sidebar is populated for admins
+        try{ loadCourses(); } catch(e){}
     })();
     </script>
     <script type="module">
