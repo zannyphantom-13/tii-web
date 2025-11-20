@@ -89,6 +89,15 @@
                     out.style.color = '#2a6e62'; out.textContent = 'Course added successfully.';
                     // show link to course
                     const link = document.createElement('a'); link.href = jb.url || '#'; link.target = '_blank'; link.textContent = 'Open course page'; link.className='explore-btn-secondary'; link.style.display='inline-block'; link.style.marginTop='8px'; out.appendChild(link);
+                    // notify other tabs/pages so curriculum views can refresh automatically
+                    try{
+                        const payload = { type: 'courses.updated', when: Date.now(), placement };
+                        if ('BroadcastChannel' in window) {
+                            const bc = new BroadcastChannel('courses'); bc.postMessage(payload); bc.close();
+                        }
+                        // fallback for older browsers/tabs
+                        localStorage.setItem('courses.updated', String(Date.now()));
+                    }catch(e){ /* ignore */ }
                 } else {
                     out.style.color='#c0392b'; out.textContent = `Failed to add course: ${jb && jb.message ? jb.message : resp.status}`;
                 }

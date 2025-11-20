@@ -161,40 +161,56 @@
                 function isUploadedCourse(c){
                     return (c && ((c.created_by && String(c.created_by).toLowerCase() !== 'static') || (c.id && String(c.id).startsWith('c_'))));
                 }
-                // Filter courses and render them; exclude admin/system placeholder titles
+                // Filter courses and render them; treat missing placement as curriculum by default
                 function placementIsCurriculum(p){
                     if (!p && p !== 0) return true; // treat missing placement as curriculum-friendly
                     const v = String(p).trim().toLowerCase();
                     return v === 'curriculum' || v === 'list' || v === 'display as list' || v.indexOf('curr') !== -1;
                 }
 
-                // Only show the canonical curriculum courses on this page.
-                // Any other added courses will remain reachable from "Other Courses".
-                const ALLOWED_TITLES = new Set([
-                    'programming',
-                    'data analysis',
-                    'drug discovery',
-                    'computational chemistry',
-                    'bioinformatics'
-                ]);
+                // Render any course whose placement resolves to curriculum (including uploaded courses explicitly placed in 'curriculum')
+                function renderCourses(list){
+                    const seen = new Set();
+                    list
+                        .filter(c => placementIsCurriculum(c.placement) && c.title && c.title.trim() !== '' )
+                        .forEach(c => {
+                            const titleKey = (c.title||'').trim();
+                            if (!titleKey) return;
+                            if (seen.has(titleKey)) return; seen.add(titleKey);
+                            const exists = Array.from(grid.querySelectorAll('.other-course-card')).some(card => card.querySelector('h4') && card.querySelector('h4').textContent.trim() === titleKey);
+                            if (exists) return;
+                            const card = createCourseCard(c);
+                            grid.appendChild(card);
+                        });
+                }
 
-                data.courses
-                    .filter(c => placementIsCurriculum(c.placement) && c.title && c.title.trim() !== '' )
-                    // Include either canonical curriculum courses OR uploaded courses explicitly placed in 'curriculum'
-                    .filter(c => {
-                        const titleKey = (c.title||'').trim().toLowerCase();
-                        if (ALLOWED_TITLES.has(titleKey)) return true;
-                        // allow uploaded courses when placement is explicitly 'curriculum'
-                        if ((c.placement && String(c.placement).trim().toLowerCase() === 'curriculum') && isUploadedCourse(c)) return true;
-                        return false;
-                    })
-                    .forEach(c => {
-                        // avoid duplicates by title
-                        const exists = Array.from(grid.querySelectorAll('.other-course-card')).some(card => card.querySelector('h4') && card.querySelector('h4').textContent.trim() === (c.title||'').trim());
-                        if (exists) return;
-                        const card = createCourseCard(c);
-                        grid.appendChild(card);
-                    });
+                // Expose a loader that can be re-run by other tabs via BroadcastChannel or storage events
+                async function loadCurriculumCourses(){
+                    try{
+                        // clear static placeholders then fetch
+                        grid.innerHTML = '';
+                        const API_URL = window.location.origin || 'http://localhost:3000';
+                        const resp = await fetch(`${API_URL}/api/courses`);
+                        if (!resp.ok) return;
+                        const data = await resp.json();
+                        if (!data.courses || !data.courses.length) return;
+                        renderCourses(data.courses);
+                    } catch(err){ console.error('Failed to load curriculum courses', err); }
+                }
+
+                // initial load
+                loadCurriculumCourses();
+
+                // Listen for cross-tab updates via BroadcastChannel and localStorage (fallback)
+                (function setupCourseUpdateListeners(){
+                    try{
+                        if ('BroadcastChannel' in window) {
+                            const bc = new BroadcastChannel('courses');
+                            bc.addEventListener('message', ev => { if (ev && ev.data && ev.data.type === 'courses.updated') loadCurriculumCourses(); });
+                        }
+                    } catch(e){}
+                    window.addEventListener('storage', (e) => { if (e.key === 'courses.updated') loadCurriculumCourses(); });
+                })();
             } catch (e) { console.error('Failed to load curriculum courses', e); }
         })();
         </script>
