@@ -157,6 +157,10 @@
                     a.appendChild(actionsWrap);
                     return a;
                 }
+                // Helper: uploaded/generated course marker
+                function isUploadedCourse(c){
+                    return (c && ((c.created_by && String(c.created_by).toLowerCase() !== 'static') || (c.id && String(c.id).startsWith('c_'))));
+                }
                 // Filter courses and render them; exclude admin/system placeholder titles
                 function placementIsCurriculum(p){
                     if (!p && p !== 0) return true; // treat missing placement as curriculum-friendly
@@ -176,6 +180,8 @@
 
                 data.courses
                     .filter(c => placementIsCurriculum(c.placement) && c.title && c.title.trim() !== '' )
+                    // Exclude uploaded/generated courses so they only appear on Other Courses
+                    .filter(c => !isUploadedCourse(c))
                     // limit to the canonical set (case-insensitive)
                     .filter(c => ALLOWED_TITLES.has((c.title||'').trim().toLowerCase()))
                     .forEach(c => {
